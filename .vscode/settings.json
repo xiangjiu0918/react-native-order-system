@@ -1,0 +1,9 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "prettier.tabWidth": 2, // 缩进字节数
+  "prettier.useTabs": true, // 缩进使用tab，不使用空格
+  "prettier.semi": true, // 句尾添加分号
+  "editor.tabMoveFocus": false,
+}

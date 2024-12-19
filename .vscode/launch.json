@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Attach to Hermes application",
+            "request": "attach",
+            "type": "reactnativedirect",
+            "cwd": "${workspaceFolder}"
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "test",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["jest"],
+            "protocol": "inspector"
+        }
+        
+    ]
+}
