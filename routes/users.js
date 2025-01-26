@@ -109,7 +109,8 @@ router.post('/sign_in', async function(req, res, next) {
         userId: user.id
       }, process.env.SECRET, { expiresIn: '30d' }
     );
-    success(res, '登录成功。', { token });
+    delete user.dataValues.password;
+    success(res, '登录成功。', { token, user });
   } catch (error) {
     failure(res, error);
   }
