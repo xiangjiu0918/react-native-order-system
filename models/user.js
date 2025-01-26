@@ -24,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         notNull: { msg: '用户名必须填写。' },
         notEmpty: { msg: '用户名不能为空。' },
-        len: { args: [2, 45], msg: '长度必须是2 ~ 45之间。' }
+        len: { args: [2, 45], msg: '用户名长度必须在2 ~ 45之间。' }
       }
     },
     password: {
@@ -39,7 +39,7 @@ module.exports = (sequelize, DataTypes) => {
           if (value.length >= 6 && value.length <= 45) {
             this.setDataValue('password', bcrypt.hashSync(value, 10));
           } else {
-            throw new BadRequest('密码长度必须是6 ~ 45之间');
+            throw new BadRequest('密码长度必须在6 ~ 45之间');
           }
         }
       }
