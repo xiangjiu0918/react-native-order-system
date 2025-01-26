@@ -18,7 +18,7 @@
   },
   "production": {
     "username": "root",
-    "password": null,
+    "password": "5072363976ce00d4",
     "database": "orderSystem_production",
     "host": "127.0.0.1",
     "dialect": "mysql",
