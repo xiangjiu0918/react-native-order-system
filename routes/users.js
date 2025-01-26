@@ -141,4 +141,15 @@ router.post('/avatar', userAuth, function (req, res) {
   }
 })
 
+/**
+ * 获取用户信息
+ * GET /users
+ */
+router.get('/', userAuth, async function (req, res) {
+  const user = await User.findOne({ where: { id: req.userId } });
+  delete user.dataValues.password;
+  success(res, '获取用户信息成功。', { user });
+})
+
+
 module.exports = router;
