@@ -1,11 +1,12 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
 const axios = require('axios');
 const { Address } = require('../models');
 const { success, failure } = require('../utils/responses');
 const { NotFound } = require('http-errors');
 const userAuth = require('../middlewares/user-auth');
 const { delKey, getKey, setKey, getKeysByPattern } = require('../utils/redis');
+const { Op } = require('sequelize');
 
 /**
  * 过滤输入
@@ -96,7 +97,7 @@ router.post('/', userAuth, async function (req, res) {
  * 删除收货地址
  * DELETE /addresses/:id
  */
-router.delete('/:id', async function (req, res) {
+router.delete('/:id', userAuth, async function (req, res) {
   try {
     await Address.destroy({ where: { id: req.params.id } });
     await clearCache(req.params.id);
@@ -110,7 +111,7 @@ router.delete('/:id', async function (req, res) {
  * 修改收货地址
  * PUT /addresses/:id
  */
-router.put('/:id', async function (req, res, next) {
+router.put('/:id', userAuth, async function (req, res, next) {
   try {
     const address = await findAddress(req.params.id);
     const body = filterBody(req);
@@ -126,7 +127,7 @@ router.put('/:id', async function (req, res, next) {
  * 查询收货地址列表
  * GET /addresses
  */
-router.get('/', async function (req, res, next) {
+router.get('/', userAuth, async function (req, res, next) {
   try {
     const currentPage = Math.abs(req.query.currentPage) || 1;
     const pageSize = Math.abs(req.query.pageSize) || 10;
@@ -143,7 +144,11 @@ router.get('/', async function (req, res, next) {
       order: [['id', 'ASC']],
       limit: pageSize,
       offset,
-      where: {},
+      where: {
+        userId: {
+          [Op.eq]: req.userId
+        }
+      },
     };
     const { count, rows } = await Address.findAndCountAll(condition);
     data = {
@@ -163,7 +168,7 @@ router.get('/', async function (req, res, next) {
  * 查询单个收货地址
  * GET /addresses/:id
  */
-router.get('/:id', async function(req, res, next) {
+router.get('/:id', userAuth, async function(req, res, next) {
   try {
     const { id } = req.params;
 
