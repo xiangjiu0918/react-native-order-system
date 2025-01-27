@@ -155,6 +155,7 @@ router.post('/avatar', userAuth, function (req, res) {
  */
 router.get('/', userAuth, async function (req, res) {
   const user = await User.findOne({ where: { id: req.userId } });
+  user.dataValues.avatar = `http://${process.env.CDN_DOMAIN}/${user.dataValues.avatar}`;
   delete user.dataValues.password;
   success(res, '获取用户信息成功。', { user });
 })

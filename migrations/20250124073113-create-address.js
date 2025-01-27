@@ -30,7 +30,7 @@ module.exports = {
         type: Sequelize.TEXT
       },
       default: {
-        default: false,
+        defaultValue: false,
         type: Sequelize.BOOLEAN
       },
       createdAt: {

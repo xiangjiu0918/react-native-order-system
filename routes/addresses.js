@@ -17,9 +17,9 @@ function filterBody(req) {
     userId: req.userId,
     name: req.body.name,
     tel: req.body.tel,
-    district: req.body.district,
+    district: JSON.stringify(req.body.district),
     detail: req.body.detail,
-    default: req.body.default,
+    default: Boolean(req.body.default),
   };
 }
 
@@ -49,6 +49,17 @@ async function findAddress(id) {
     return address;
   } else {
     throw new NotFound("地址不存在");
+  }
+}
+
+async function removeOldDefault() {
+  // 修改旧的默认地址
+  const defaultItem = await Address.findOne({
+    where: { default: true }
+  });
+  if (defaultItem) {
+    delKey('address:default');
+    defaultItem.update({ default: false });
   }
 }
 
@@ -85,6 +96,9 @@ router.get('/district/list', userAuth, async function (req, res) {
 router.post('/', userAuth, async function (req, res) {
   try {
     const body = filterBody(req);
+    if (body.default === true) {
+      removeOldDefault();
+    }
     const address = await Address.create(body);
     await clearCache();
     success(res, '创建收货地址成功', { address }, 201);
@@ -99,6 +113,8 @@ router.post('/', userAuth, async function (req, res) {
  */
 router.delete('/:id', userAuth, async function (req, res) {
   try {
+    const address = findAddress(req.params.id);
+    if (address.dataValues.default === true) delKey('address:default')
     await Address.destroy({ where: { id: req.params.id } });
     await clearCache(req.params.id);
     success(res, '删除收货地址成功。');
@@ -115,6 +131,9 @@ router.put('/:id', userAuth, async function (req, res, next) {
   try {
     const address = await findAddress(req.params.id);
     const body = filterBody(req);
+    if (body.default === true) {
+      removeOldDefault();
+    }
     await address.update(body);
     await clearCache(address.id);
     success(res, "修改地址成功");
@@ -151,8 +170,18 @@ router.get('/', userAuth, async function (req, res, next) {
       },
     };
     const { count, rows } = await Address.findAndCountAll(condition);
+    const addresses = rows.map(item => {
+      item.dataValues.district = JSON.parse(item.dataValues.district);
+      return item;
+    })
+
+    const defaultItem = await Address.findOne({
+      where: { default: true },
+      attributes: ['id'],
+    });
     data = {
-      addresses: rows,
+      addresses,
+      defaultId: defaultItem.dataValues.id,
       total: count,
       currentPage,
       pageSize,
@@ -165,18 +194,52 @@ router.get('/', userAuth, async function (req, res, next) {
 })
 
 /**
+ * 获取默认收货地址
+ * GET /addresses/default
+ */
+router.get('/default', userAuth, async function (req, res, next) {
+  try {
+
+    let address = await getKey('address:default');
+    if (!address) {
+      address = await Address.findOne({
+        where: { default: true }
+      });
+      if (address) {
+        address.dataValues.district = JSON.parse(address.dataValues.district);
+      } else {
+        // 没有默认记录就返回第一条记录
+        address = await Address.findOne({
+          where: {}
+        });
+        if (!address) {
+          throw new NotFound('收货地址为空');
+        }
+      }
+      await setKey('address:default', address);
+    }
+    success(res, "查询收货地址成功", { address });
+  } catch (e) {
+    failure(res, e, "查询收货地址失败");
+  }
+})
+
+
+/**
  * 查询单个收货地址
  * GET /addresses/:id
  */
-router.get('/:id', userAuth, async function(req, res, next) {
+router.get('/:id', userAuth, async function (req, res, next) {
   try {
     const { id } = req.params;
 
     let address = await getKey(`address:${id}`);
     if (!address) {
       address = await Address.findByPk(id);
-      if (!address) {
-        throw new NotFound(`ID: ${ id }的文章未找到。`)
+      if (address) {
+        address.dataValues.district = JSON.parse(address.dataValues.district);
+      } else {
+        throw new NotFound(`ID: ${id}的收货地址未找到。`)
       }
       await setKey(`address:${id}`, address)
     }
