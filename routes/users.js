@@ -42,7 +42,7 @@ router.post('/sign_up', validateCaptcha, async function (req, res) {
       email: req.body.email,
       name: req.body.name,
       password: req.body.password,
-      avatar: 'https://xiangjiu0918.oss-cn-shenzhen.aliyuncs.com/uploads/defaultAvator.jpeg'
+      avatar: 'uploads/defaultAvator.jpeg'
     }
     const user = await User.create(body);
     delete user.dataValues.password;         // 删除密码
@@ -71,7 +71,7 @@ router.post('/sign_up', validateCaptcha, async function (req, res) {
  * 用户登录
  * POST /users/sign_in
  */
-router.post('/sign_in', async function(req, res, next) {
+router.post('/sign_in', async function (req, res, next) {
   try {
     const { login, password } = req.body;
 
@@ -106,8 +106,8 @@ router.post('/sign_in', async function(req, res, next) {
 
     // 生成身份验证令牌
     const token = jwt.sign({
-        userId: user.id
-      }, process.env.SECRET, { expiresIn: '30d' }
+      userId: user.id
+    }, process.env.SECRET, { expiresIn: '30d' }
     );
     delete user.dataValues.password;
     success(res, '登录成功。', { token, user });
@@ -122,19 +122,27 @@ router.post('/sign_in', async function(req, res, next) {
  */
 router.post('/avatar', userAuth, function (req, res) {
   try {
+    // let form = new multiparty.Form();
+    // form.parse(req, (err, fields, file) => {
+    //   console.log("field", fields, "file", file);
+    // });
     avatarUpload(req, res, async function (error) {
-      if (error) {
-        throw err;
-      }
-      if (!req.file) {
-        throw new BadRequest('请选择要上传的文件');
-      }
-      const user = await User.findOne({ where: { id: req.userId } });
-      await user.update({
-        avatar: req.file.path + '/' + req.file.filename,
-      });
+      try {
+        if (error) {
+          throw err;
+        }
+        if (!req.file) {
+          throw new BadRequest('请选择要上传的文件');
+        }
+        const user = await User.findOne({ where: { id: req.userId } });
+        await user.update({
+          avatar: req.file.path + '/' + req.file.filename,
+        });
 
-      success(res, '上传成功。', { avatar: req.file.url });
+        success(res, '上传成功。', { avatar: `http://${process.env.CDN_DOMAIN}/${req.file.path}/${req.file.filename}` });
+      } catch (e) {
+        failure(res, e);
+      }
     });
   } catch (error) {
     failure(res, error);
