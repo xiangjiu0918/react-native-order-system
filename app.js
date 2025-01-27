@@ -7,6 +7,7 @@ require('dotenv').config();
 const indexRouter = require('./routes/index');
 const captchaRouter = require('./routes/captcha');
 const usersRouter = require('./routes/users');
+const addressesRouter = require('./routes/addresses');
 
 const app = express();
 
@@ -19,5 +20,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/captcha', captchaRouter);
 app.use('/users', usersRouter);
+app.use('/addresses', addressesRouter)
 
 module.exports = app;

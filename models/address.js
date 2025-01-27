@@ -2,6 +2,7 @@
 const {
   Model
 } = require('sequelize');
+const { BadRequest } = require('http-errors');
 module.exports = (sequelize, DataTypes) => {
   class Address extends Model {
     /**
@@ -15,9 +16,20 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Address.init({
-    userId: DataTypes.NUMBER,
+    userId: DataTypes.INTEGER,
     name: DataTypes.STRING,
-    tel: DataTypes.STRING,
+    tel: {
+      type: DataTypes.STRING,
+      set(value) {
+        if (value) {
+          if (value.match(/^1[3-9]\d{9}$/)) {
+            this.setDataValue('tel', value);
+          } else {
+            throw new BadRequest('手机号不合法！');
+          }
+        }
+      }
+    },
     district: DataTypes.STRING,
     detail: DataTypes.TEXT,
     default: DataTypes.BOOLEAN
