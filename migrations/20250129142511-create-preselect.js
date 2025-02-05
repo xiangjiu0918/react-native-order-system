@@ -2,7 +2,7 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Addresses", {
+    await queryInterface.createTable("Preselects", {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -13,25 +13,21 @@ module.exports = {
         allowNull: false,
         type: Sequelize.INTEGER,
       },
-      name: {
+      categoryId: {
+        allowNull: false,
+        type: Sequelize.INTEGER,
+      },
+      addressId: {
+        allowNull: false,
+        type: Sequelize.INTEGER,
+      },
+      num: {
+        defaultValue: 1,
+        type: Sequelize.INTEGER,
+      },
+      size: {
         allowNull: false,
         type: Sequelize.STRING,
-      },
-      tel: {
-        allowNull: false,
-        type: Sequelize.STRING,
-      },
-      district: {
-        allowNull: false,
-        type: Sequelize.STRING,
-      },
-      detail: {
-        allowNull: false,
-        type: Sequelize.TEXT,
-      },
-      default: {
-        defaultValue: false,
-        type: Sequelize.BOOLEAN,
       },
       createdAt: {
         allowNull: false,
@@ -42,8 +38,17 @@ module.exports = {
         type: Sequelize.DATE,
       },
     });
+    await queryInterface.addIndex("Preselects", {
+      fields: ["userId"],
+    });
+    await queryInterface.addIndex("Preselects", {
+      fields: ["categoryId"],
+    });
+    await queryInterface.addIndex("Preselects", {
+      fields: ["addressId"],
+    });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("Addresses");
+    await queryInterface.dropTable("Preselects");
   },
 };

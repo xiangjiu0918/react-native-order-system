@@ -2,43 +2,39 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Goods", {
+    await queryInterface.createTable("Orders", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      name: {
-        allowNull: false,
+      orderId: {
         type: Sequelize.STRING,
       },
-      price: {
-        allowNull: false,
+      userId: {
         type: Sequelize.INTEGER,
       },
-      sale: {
-        default: 0,
+      categoryId: {
         type: Sequelize.INTEGER,
       },
-      district: {
-        allowNull: false,
+      addressId: {
+        type: Sequelize.INTEGER,
+      },
+      num: {
+        type: Sequelize.INTEGER,
+      },
+      size: {
         type: Sequelize.STRING,
       },
-      postage: {
-        allowNull: false,
-        type: Sequelize.INTEGER,
+      orderTime: {
+        type: Sequelize.DATE,
       },
-      previewUrl: {
-        allowNull: false,
-        type: Sequelize.TEXT,
-      },
-      timeOfSale: {
-        allowNull: false,
+      paymentTime: {
         type: Sequelize.DATE,
       },
       status: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.BOOLEAN,
       },
       createdAt: {
         allowNull: false,
@@ -49,8 +45,17 @@ module.exports = {
         type: Sequelize.DATE,
       },
     });
+    await queryInterface.addIndex("Orders", {
+      fields: ["userId"],
+    });
+    await queryInterface.addIndex("Orders", {
+      fields: ["categoryId"],
+    });
+    await queryInterface.addIndex("Orders", {
+      fields: ["addressId"],
+    });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("Goods");
+    await queryInterface.dropTable("Orders");
   },
 };

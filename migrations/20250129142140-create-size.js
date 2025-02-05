@@ -2,36 +2,20 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Addresses", {
+    await queryInterface.createTable("Sizes", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      userId: {
+      goodId: {
         allowNull: false,
         type: Sequelize.INTEGER,
       },
       name: {
         allowNull: false,
         type: Sequelize.STRING,
-      },
-      tel: {
-        allowNull: false,
-        type: Sequelize.STRING,
-      },
-      district: {
-        allowNull: false,
-        type: Sequelize.STRING,
-      },
-      detail: {
-        allowNull: false,
-        type: Sequelize.TEXT,
-      },
-      default: {
-        defaultValue: false,
-        type: Sequelize.BOOLEAN,
       },
       createdAt: {
         allowNull: false,
@@ -42,8 +26,11 @@ module.exports = {
         type: Sequelize.DATE,
       },
     });
+    await queryInterface.addIndex("Sizes", {
+      fields: ["goodId"],
+    });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("Addresses");
+    await queryInterface.dropTable("Sizes");
   },
 };
