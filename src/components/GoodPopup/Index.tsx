@@ -14,8 +14,10 @@ import Popup, {type BasePopupProp} from '@/components/Popup/Index';
 import AddressPopup from '@/components/AddressPopup/Index';
 import LoadPopup from '@/components/LoadPopup/Index';
 import PayPopup from '@/components/PayPopup/Index';
-import {useAppSelector} from '@/store/hooks';
+import {useAppSelector, useAppDispatch} from '@/store/hooks';
+import {initList} from '@/store/slice/addressSlice';
 import {EventRegister} from 'react-native-event-listeners';
+import axios from '@/utils/axios';
 
 interface GoodPopupProp extends BasePopupProp {
   mode: 'preSelect' | 'purchase';
@@ -35,6 +37,7 @@ let {width: windowWidth, height: windowHeight} = Dimensions.get('window');
 
 export default function GoodPopup(props: GoodPopupProp) {
   const {username} = useAppSelector(state => state.user);
+  const dispatch = useAppDispatch();
   const address = useAppSelector(state => state.address);
   const [selectAddress, changeSelectAddress] = useState(
     address.default === null
@@ -92,6 +95,18 @@ export default function GoodPopup(props: GoodPopupProp) {
       stockout: false,
     },
   ];
+  useEffect(() => {
+    axios.get('/addresses/default').then(res => {
+      const {address} = res.data?.data;
+      if (address?.default === true) {
+        changeSelectAddress(address);
+        dispatch(initList({list: [address], default: address.id}));
+      } else {
+        changeSelectAddress(address);
+        dispatch(initList({list: [address], default: null}));
+      }
+    });
+  }, []);
   const handleAddressVisible = () => {
     changeAddressVisible(!addressVisible);
   };

@@ -9,50 +9,114 @@ import {
 import React, {useState} from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {type NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useAppSelector, useAppDispatch} from '@/store/hooks';
-import {load, UserState} from '@/store/slice/userSlice';
+import qs from 'qs';
+import axios from '@/utils/axios';
+import {useAppDispatch} from '@/store/hooks';
+import {load} from '@/store/slice/userSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+interface LoadProp {
+  handleLoad?: () => void;
+  handleSignUp?: () => void;
+}
 
-export default function Load({handleLoad}: {handleLoad?: () => void}) {
-  const {username, password} = useAppSelector(state => state.user);
-  const [tmpUsername, onChangeUsername] = useState(username);
-  const [tmpPwd, onChangePwd] = useState(password);
+export default function Load({handleLoad, handleSignUp}: LoadProp) {
+  // const {username, password} = useAppSelector(state => state.user);
+  const [login, onChangeLogin] = useState('');
+  const [pwd, onChangePwd] = useState('');
+  const [loginWarn, setLoginWarn] = useState('');
+  const [pwdWarn, setPwdWarn] = useState('');
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  function hanleLoad() {
-    const payload: UserState = {
-      username: tmpUsername,
-      password: tmpPwd,
-    };
-    dispatch(load(payload));
-    ToastAndroid.show('登陆成功', ToastAndroid.SHORT);
-    if (handleLoad) {
-      handleLoad();
-    }
+  function pressLoad() {
+    const params = qs.stringify({
+      login,
+      password: pwd,
+    });
+    axios
+      .post('/users/sign_in', params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      })
+      .then(
+        res => {
+          // console.log('res', res);
+          global.token = res.data?.data?.token;
+          const {name: username, email, avatar} = res.data?.data?.user;
+          dispatch(load({username, email, avatar}));
+          AsyncStorage.setItem('token', res.data?.data?.token);
+          ToastAndroid.show('登陆成功', ToastAndroid.SHORT);
+          if (handleLoad) {
+            handleLoad();
+          }
+        },
+        err => {
+          console.log('err', err);
+          err.response.data.errors.forEach((e: string) => {
+            if (e.match(/用户/) || e.match(/邮箱/)) {
+              setLoginWarn(e);
+            }
+            if (e.match(/密码/)) {
+              setPwdWarn(e);
+            }
+          });
+        },
+      );
+  }
+  function pressSignUp() {
+    handleSignUp && handleSignUp();
   }
   return (
     <View style={LoadStyle.container}>
       <View style={LoadStyle.flexBoxC}>
-        <Text style={LoadStyle.label}>用户名:</Text>
-        <TextInput
-          style={LoadStyle.input}
-          value={tmpUsername}
-          onChangeText={onChangeUsername}
-          placeholder="请输入用户名"
-        />
+        <Text style={LoadStyle.label}>用户名/邮箱:</Text>
+        <View style={{width: 200}}>
+          <TextInput
+            style={[
+              LoadStyle.input,
+              loginWarn !== '' ? {borderColor: 'red'} : {},
+            ]}
+            value={login}
+            onChangeText={onChangeLogin}
+            placeholder="请输入用户名或邮箱"
+            onFocus={() => setLoginWarn('')}
+          />
+          {loginWarn !== '' ? (
+            <Text style={LoadStyle.highlight}>{loginWarn}</Text>
+          ) : (
+            <></>
+          )}
+        </View>
       </View>
       <View style={LoadStyle.flexBoxC}>
         <Text style={LoadStyle.label}>密码:</Text>
-        <TextInput
-          style={LoadStyle.input}
-          value={tmpPwd}
-          onChangeText={onChangePwd}
-          placeholder="请输入密码"
-        />
+        <View style={{width: 200}}>
+          <TextInput
+            style={[
+              LoadStyle.input,
+              pwdWarn !== '' ? {borderColor: 'red'} : {},
+            ]}
+            value={pwd}
+            onChangeText={onChangePwd}
+            placeholder="请输入密码"
+            onFocus={() => setPwdWarn('')}
+          />
+          {pwdWarn !== '' ? (
+            <Text style={LoadStyle.highlight}>{pwdWarn}</Text>
+          ) : (
+            <></>
+          )}
+        </View>
       </View>
-      <Pressable style={LoadStyle.loadBtn} onPress={hanleLoad}>
+      <Pressable style={LoadStyle.loadBtn} onPress={pressLoad}>
         <Text style={LoadStyle.loadText}>登录</Text>
       </Pressable>
-      <Text>* 首次登录会自动注册账号</Text>
+      <View style={LoadStyle.remark}>
+        <Text>* 还没有账号？</Text>
+        <Pressable onPress={pressSignUp}>
+          <Text style={LoadStyle.signUp}>去注册 {`>`}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -67,7 +131,7 @@ const LoadStyle = StyleSheet.create({
     flex: 1,
   },
   flexBoxC: {
-    width: 280,
+    width: 320,
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,6 +143,9 @@ const LoadStyle = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
     padding: 10,
+  },
+  highlight: {
+    color: 'red',
   },
   loadBtn: {
     paddingHorizontal: 40,
@@ -95,5 +162,13 @@ const LoadStyle = StyleSheet.create({
     fontSize: 18,
     lineHeight: 40,
     height: 40,
+  },
+  remark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  signUp: {
+    color: '#2196F3',
+    textDecorationLine: 'underline',
   },
 });

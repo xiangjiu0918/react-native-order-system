@@ -9,7 +9,7 @@ import {
 import React, {useEffect, useState, useRef} from 'react';
 import CheckBox from '@react-native-community/checkbox';
 import {NavigationProp} from '@react-navigation/native';
-import axios from 'axios';
+import axios from '@/utils/axios';
 import {Picker, Provider} from '@ant-design/react-native';
 import {Md5} from 'ts-md5';
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/store/slice/addressSlice';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {EventRegister} from 'react-native-event-listeners';
+import alert from '@/utils/alert';
 
 interface districtOption {
   value: string;
@@ -34,7 +35,7 @@ export default function AddAddress(props: {
 }) {
   const {navigation} = props;
   const payload = props.route?.params;
-  const [isDefault, switchDefault] = useState(false);
+  const [isDefault, switchDefault] = useState(payload?.default || false);
   const [name, changeName] = useState(payload?.name || '');
   const [tel, changeTel] = useState(payload?.tel || '');
   const [district, changeDistrict] = useState(payload?.district || []);
@@ -59,20 +60,41 @@ export default function AddAddress(props: {
     const payloadBase: Address = {
       name,
       tel,
-      district,
+      district: district,
       detail,
       default: isDefault,
     };
     if (payload === undefined) {
-      dispatch(addItem(payloadBase));
-      ToastAndroid.show('添加成功', ToastAndroid.SHORT);
+      axios.post('/addresses', payloadBase).then(
+        res => {
+          dispatch(addItem(payloadBase));
+          ToastAndroid.show('添加成功', ToastAndroid.SHORT);
+        },
+        err => {
+          console.log('err', err);
+          alert();
+        },
+      );
     } else {
-      const payloadWithId: AddressStore = {
-        ...payloadBase,
-        id: payload.id,
-      };
-      dispatch(changeItem(payloadWithId));
-      ToastAndroid.show('修改成功', ToastAndroid.SHORT);
+      axios
+        .put(`/addresses/${payload.id}`, payloadBase, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        })
+        .then(
+          res => {
+            const payloadWithId: AddressStore = {
+              ...payloadBase,
+              id: payload.id,
+            };
+            dispatch(changeItem(payloadWithId));
+            ToastAndroid.show('修改成功', ToastAndroid.SHORT);
+          },
+          err => {
+            alert();
+          },
+        );
     }
     if (props.showBtn === true) {
       // 说明是全屏模式
@@ -87,19 +109,12 @@ export default function AddAddress(props: {
     const sig = Md5.hashStr(
       '/ws/district/v1/list?key=U3MBZ-EXWCT-2L2X2-VDRMF-WRVH2-QXF3M&struct_type=1nigx3vilUvqIpiA99xdSDpKyQurO8OEH',
     ).toLowerCase();
-    axios
-      .get('https://apis.map.qq.com/ws/district/v1/list', {
-        params: {
-          key: 'U3MBZ-EXWCT-2L2X2-VDRMF-WRVH2-QXF3M',
-          struct_type: 1,
-          sig,
-        },
-      })
-      .then(res => {
-        if (res.status === 200) {
-          setList(transDistrict(res.data.result));
-        }
-      });
+    axios.get('/addresses/district/list').then(
+      res => {
+        setList(transDistrict(res.data?.data?.list));
+      },
+      err => alert(),
+    );
     return () => {
       EventRegister.removeEventListener(submitListener as string);
     };

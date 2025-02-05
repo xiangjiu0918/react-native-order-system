@@ -1,0 +1,10 @@
+{
+  "development": {
+    "baseURL": "https://api.xiangjiu.online",
+    "timeout": 5000
+  },
+  "production": {
+    "baseURL": "",
+    "timeout": 5000
+  }
+}

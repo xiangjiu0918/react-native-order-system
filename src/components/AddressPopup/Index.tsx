@@ -1,5 +1,5 @@
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import Icons from 'react-native-vector-icons/AntDesign';
 import {EventRegister} from 'react-native-event-listeners';
 import Popup, {type BasePopupProp} from '../Popup/Index';
@@ -28,13 +28,17 @@ export default function AddressPopup(props: AddressPopupProp) {
   const handleAddVisible = () => {
     changeAddVisible(!addVisible);
   };
+  function handleClose() {
+    switchMode(false);
+    changeCurrentSelect(props.selectItem);
+  }
   return (
     <>
       <Popup
         {...props}
         btnText="确认"
         title="收货地址"
-        closeCallback={() => switchMode(false)}
+        closeCallback={handleClose}
         btnCallBack={() => props.changeSelectItem(currentSelect)}>
         <View style={[PopupStyle.flexBox, PopupStyle.container]}>
           <Text style={{color: 'black', fontWeight: '500'}}>常用地址</Text>

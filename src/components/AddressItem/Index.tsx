@@ -5,15 +5,18 @@ import {
   useWindowDimensions,
   StatusBar,
   Pressable,
+  Alert,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useHeaderHeight} from '@react-navigation/elements';
 import Icons from 'react-native-vector-icons/AntDesign';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {EventRegister} from 'react-native-event-listeners';
+import axios from '@/utils/axios';
 import {useAppSelector, useAppDispatch} from '@/store/hooks';
+import {initList} from '@/store/slice/addressSlice';
 import {
   AddressStore,
   changeItem,
@@ -22,6 +25,7 @@ import {
   selectAddress,
 } from '@/store/slice/addressSlice';
 import CheckBox from '@react-native-community/checkbox';
+import alert from '@/utils/alert';
 
 export default function AddressItem({
   selectItem,
@@ -40,6 +44,25 @@ export default function AddressItem({
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   EventRegister.addEventListener('manageAddress', () => switchMode(true));
   EventRegister.addEventListener('existManage', () => switchMode(false));
+  useEffect(() => {
+    initAddress();
+  }, []);
+  function initAddress() {
+    axios.get('/addresses').then(
+      res => {
+        const {addresses: list, defaultId} = res.data?.data;
+        dispatch(
+          initList({
+            list,
+            default: defaultId,
+          }),
+        );
+      },
+      err => {
+        alert();
+      },
+    );
+  }
   function handleEdit(address: AddressStore) {
     return () => {
       navigation.navigate('AddAddress', address);
@@ -75,7 +98,7 @@ export default function AddressItem({
             AddressStyle.item,
             item.id === selectItem?.id ? {backgroundColor: '#fff1eb'} : {},
           ]}
-          onPress={() => changeSelectItem(item)}>
+          onPress={() => changeSelectItem && changeSelectItem(item)}>
           <View style={AddressStyle.abstract}>
             <View style={{gap: 5}}>
               <Text

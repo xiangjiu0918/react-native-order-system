@@ -54,10 +54,13 @@ export const addressSlice = createSlice({
         }, changeDefault(state, action: PayloadAction<{ isDefault: boolean, id: number }>) {
             if (action.payload.isDefault === true) state.default = action.payload.id;
             else if (state.default === action.payload.id) state.default = null;
-        },
+        }, initList(state, action: PayloadAction<{list: AddressStore[], default: (number | null)}>) {
+            state.list = action.payload.list;
+            state.default = action.payload.default;
+        }
     }
 })
 
-export const { addItem, deleteItem, changeItem, changeDefault } = addressSlice.actions;
+export const { addItem, deleteItem, changeItem, changeDefault, initList } = addressSlice.actions;
 export const selectAddress = (state: RootState) => state.address;
 export default addressSlice.reducer;
