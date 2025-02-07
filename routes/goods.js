@@ -88,11 +88,9 @@ router.get("/", async function (req, res, next) {
     };
     const { count, rows } = await Category.findAndCountAll(condition);
     const goods = rows.map((item) => {
-      const previewUrl = JSON.parse(
+      const previewUrl = `http://${process.env.CDN_DOMAIN}/${JSON.parse(
         item.dataValues.good.dataValues.previewUrl
-      ).map((i) => {
-        return `http://${process.env.CDN_DOMAIN}/${i}`;
-      });
+      )[0]}`;
       return {
         price: item.dataValues.price,
         ...item.dataValues.good.dataValues,
