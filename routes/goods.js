@@ -158,7 +158,8 @@ router.get("/:id", async function (req, res, next) {
                       typeName: t.dataValues.name,
                       thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
                       sizeName: s.dataValues.name,
-                      ...c.dataValues,
+                      inventory: c.dataValues.inventory,
+                      price: Number(c.dataValues.price),
                     };
                   })
                 );
@@ -176,7 +177,8 @@ router.get("/:id", async function (req, res, next) {
                   typeName: t.dataValues.name,
                   thumbnailUrl: t.dataValues.thumbnailUrl,
                   sizeName: null,
-                  ...c.dataValues,
+                  inventory: c.dataValues.inventory,
+                  price: Number(c.dataValues.price),
                 };
               }
             })
@@ -194,7 +196,8 @@ router.get("/:id", async function (req, res, next) {
             typeName: null,
             thumbnailUrl: null,
             sizeName: null,
-            ...c.dataValues,
+            inventory: c.dataValues.inventory,
+            price: Number(c.dataValues.price),
           };
         }
         const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
