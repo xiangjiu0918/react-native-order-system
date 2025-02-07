@@ -88,9 +88,9 @@ router.get("/", async function (req, res, next) {
     };
     const { count, rows } = await Category.findAndCountAll(condition);
     const goods = rows.map((item) => {
-      const previewUrl = `http://${process.env.CDN_DOMAIN}/${JSON.parse(
-        item.dataValues.good.dataValues.previewUrl
-      )[0]}`;
+      const previewUrl = `http://${process.env.CDN_DOMAIN}/${
+        JSON.parse(item.dataValues.good.dataValues.previewUrl)[0]
+      }`;
       return {
         price: item.dataValues.price,
         ...item.dataValues.good.dataValues,
@@ -137,50 +137,51 @@ router.get("/:id", async function (req, res, next) {
       if (!good) {
         throw new NotFound(`ID: ${id}的商品未找到。`);
       } else {
+        const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
+          return `http://${process.env.CDN_DOMAIN}/${i}`;
+        });
+        console.log("types", types, "sizes", sizes);
+        let categories = {};
+        let transTypes = [];
+        let price = Infinity; // 商品默认展示最低价格
         if (types.length > 0) {
-          category = await Promise.all(
-            types.map(async (t) => {
-              if (sizes.length > 0) {
-                return await Promise.all(
-                  sizes.map(async (s) => {
-                    const c = await Category.findOne({
-                      attributes: ["inventory", "price"],
-                      where: {
-                        typeId: t.dataValues.id,
-                        sizeId: s.dataValues.id,
-                      },
-                    });
-                    return {
-                      typeId: t.dataValues.id,
-                      sizeId: s.dataValues.id,
-                      typeName: t.dataValues.name,
-                      thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
-                      sizeName: s.dataValues.name,
-                      inventory: c.dataValues.inventory,
-                      price: Number(c.dataValues.price),
-                    };
-                  })
-                );
-              } else {
+          await Promise.all(types.map(async (t) => {
+            transTypes.push({
+              ...t.dataValues,
+              thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
+            });
+            if (sizes.length > 0) {
+              await Promise.all(sizes.map(async (s) => {
                 const c = await Category.findOne({
                   attributes: ["inventory", "price"],
                   where: {
                     typeId: t.dataValues.id,
-                    sizeId: null,
+                    sizeId: s.dataValues.id,
                   },
                 });
-                return {
-                  typeId: t.dataValues.id,
-                  sizeId: null,
-                  typeName: t.dataValues.name,
-                  thumbnailUrl: t.dataValues.thumbnailUrl,
-                  sizeName: null,
+                categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
                   inventory: c.dataValues.inventory,
                   price: Number(c.dataValues.price),
                 };
-              }
-            })
-          );
+                price = Math.min(Number(c.dataValues.price), price);
+                return;
+              }));
+            } else {
+              const c = await Category.findOne({
+                attributes: ["inventory", "price"],
+                where: {
+                  typeId: t.dataValues.id,
+                  sizeId: null,
+                },
+              });
+              categories[`${t.dataValues.id}:null`] = {
+                inventory: c.dataValues.inventory,
+                price: Number(c.dataValues.price),
+              };
+              price = Math.min(Number(c.dataValues.price), price);
+              return;
+            }
+          }));
         } else {
           const c = await Category.findOne({
             attributes: ["inventory", "price"],
@@ -188,34 +189,24 @@ router.get("/:id", async function (req, res, next) {
               goodId: id,
             },
           });
-          category = {
-            typeId: null,
-            sizeId: null,
-            typeName: null,
-            thumbnailUrl: null,
-            sizeName: null,
+          categories["null:null"] = {
             inventory: c.dataValues.inventory,
             price: Number(c.dataValues.price),
           };
+          price = Math.min(Number(c.dataValues.price), price);
         }
-        const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
-          return `http://${process.env.CDN_DOMAIN}/${i}`;
-        });
         goodWithCatgory = {
           good: {
             ...good.dataValues,
             previewUrl,
+            price,
           },
-          category,
+          types: transTypes,
+          sizes,
+          categories,
         };
         await setKey(`good:${id}`, goodWithCatgory);
       }
-      // if (good) {
-      //   good.dataValues.district = JSON.parse(good.dataValues.district);
-      // } else {
-      //   throw new NotFound(`ID: ${id}的商品未找到。`);
-      // }
-      // await setKey(`good:${id}`, good);
     }
     success(res, "查询商品成功", {
       ...goodWithCatgory,
