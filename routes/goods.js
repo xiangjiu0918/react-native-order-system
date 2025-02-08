@@ -158,7 +158,6 @@ router.get("/:id", async function (req, res, next) {
                 group: ["typeId"],
                 where: { typeId: t.dataValues.id },
               });
-              console.log("r", r);
               transTypes.push({
                 ...t.dataValues,
                 thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
@@ -219,7 +218,7 @@ router.get("/:id", async function (req, res, next) {
                     sizeId: null,
                   },
                 });
-                categories[`${t.dataValues.id}:null`] = {
+                categories[`${t.dataValues.id}:-1`] = {
                   inventory: c.dataValues.inventory,
                   price: Number(c.dataValues.price),
                 };
@@ -229,17 +228,54 @@ router.get("/:id", async function (req, res, next) {
             })
           );
         } else {
-          const c = await Category.findOne({
-            attributes: ["inventory", "price"],
-            where: {
-              goodId: id,
-            },
-          });
-          categories["null:null"] = {
-            inventory: c.dataValues.inventory,
-            price: Number(c.dataValues.price),
-          };
-          price = Math.min(Number(c.dataValues.price), price);
+          if (sizes.length > 0) {
+            await Promise.all(
+              sizes.map(async (s) => {
+                let c;
+                const arr = await Promise.all([
+                  Category.findOne({
+                    attributes: [
+                      [
+                        Sequelize.fn("SUM", Sequelize.col("inventory")),
+                        "inventory",
+                      ],
+                    ],
+                    group: ["sizeId"],
+                    where: { sizeId: s.dataValues.id },
+                  }),
+                  Category.findOne({
+                    attributes: ["inventory", "price"],
+                    where: {
+                      typeId: t.dataValues.id,
+                      sizeId: s.dataValues.id,
+                    },
+                  }),
+                ]);
+                c = arr[1];
+                transSizes.push({
+                  ...s.dataValues,
+                  stockout: arr[0]?.dataValues.inventory <= 0 ? true : false,
+                });
+                categories[`-1:${s.dataValues.id}`] = {
+                  inventory: c.dataValues.inventory,
+                  price: Number(c.dataValues.price),
+                };
+                price = Math.min(Number(c.dataValues.price), price);
+              })
+            );
+          } else {
+            const c = await Category.findOne({
+              attributes: ["inventory", "price"],
+              where: {
+                goodId: id,
+              },
+            });
+            categories["-1:-1"] = {
+              inventory: c.dataValues.inventory,
+              price: Number(c.dataValues.price),
+            };
+            price = Math.min(Number(c.dataValues.price), price);
+          }
         }
         goodWithCatgory = {
           good: {
@@ -247,8 +283,8 @@ router.get("/:id", async function (req, res, next) {
             previewUrl,
             price,
           },
-          types: transTypes,
-          sizes: transSizes,
+          types: transTypes.sort((a, b) => a.id - b.id),
+          sizes: transSizes.sort((a, b) => a.id - b.id),
           categories,
         };
         await setKey(`good:${id}`, goodWithCatgory);
