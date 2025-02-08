@@ -143,45 +143,78 @@ router.get("/:id", async function (req, res, next) {
         console.log("types", types, "sizes", sizes);
         let categories = {};
         let transTypes = [];
+        let transSizes = [];
         let price = Infinity; // 商品默认展示最低价格
         if (types.length > 0) {
-          await Promise.all(types.map(async (t) => {
-            transTypes.push({
-              ...t.dataValues,
-              thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
-            });
-            if (sizes.length > 0) {
-              await Promise.all(sizes.map(async (s) => {
+          await Promise.all(
+            types.map(async (t) => {
+              const r = await Category.findOne({
+                attributes: [
+                  [
+                    Sequelize.fn("SUM", Sequelize.col("inventory")),
+                    "inventory",
+                  ],
+                ],
+                group: ["typeId"],
+                where: { typeId: t.dataValues.id },
+              });
+              console.log("r", r);
+              transTypes.push({
+                ...t.dataValues,
+                thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
+                stockout: r?.dataValues.inventory <= 0 ? true : false,
+              });
+              if (sizes.length > 0) {
+                await Promise.all(
+                  sizes.map(async (s) => {
+                    const [r, c] = await Promise.all([
+                      Category.findOne({
+                        attributes: [
+                          [
+                            Sequelize.fn("SUM", Sequelize.col("inventory")),
+                            "inventory",
+                          ],
+                        ],
+                        group: ["sizeId"],
+                        where: { sizeId: s.dataValues.id },
+                      }),
+                      Category.findOne({
+                        attributes: ["inventory", "price"],
+                        where: {
+                          typeId: t.dataValues.id,
+                          sizeId: s.dataValues.id,
+                        },
+                      }),
+                    ]);
+                    transSizes.push({
+                      ...s.dataValues,
+                      stockout: r?.dataValues.inventory <= 0 ? true : false,
+                    });
+                    categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
+                      inventory: c.dataValues.inventory,
+                      price: Number(c.dataValues.price),
+                    };
+                    price = Math.min(Number(c.dataValues.price), price);
+                    return;
+                  })
+                );
+              } else {
                 const c = await Category.findOne({
                   attributes: ["inventory", "price"],
                   where: {
                     typeId: t.dataValues.id,
-                    sizeId: s.dataValues.id,
+                    sizeId: null,
                   },
                 });
-                categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
+                categories[`${t.dataValues.id}:null`] = {
                   inventory: c.dataValues.inventory,
                   price: Number(c.dataValues.price),
                 };
                 price = Math.min(Number(c.dataValues.price), price);
                 return;
-              }));
-            } else {
-              const c = await Category.findOne({
-                attributes: ["inventory", "price"],
-                where: {
-                  typeId: t.dataValues.id,
-                  sizeId: null,
-                },
-              });
-              categories[`${t.dataValues.id}:null`] = {
-                inventory: c.dataValues.inventory,
-                price: Number(c.dataValues.price),
-              };
-              price = Math.min(Number(c.dataValues.price), price);
-              return;
-            }
-          }));
+              }
+            })
+          );
         } else {
           const c = await Category.findOne({
             attributes: ["inventory", "price"],
@@ -202,7 +235,7 @@ router.get("/:id", async function (req, res, next) {
             price,
           },
           types: transTypes,
-          sizes,
+          sizes: transSizes,
           categories,
         };
         await setKey(`good:${id}`, goodWithCatgory);
