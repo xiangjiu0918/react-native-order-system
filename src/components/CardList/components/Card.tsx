@@ -16,7 +16,7 @@ export default function Card(props: CardProp) {
   return (
     <Pressable
       style={CardStyle.container}
-      onPress={() => navigation.navigate('Detail')}>
+      onPress={() => navigation.navigate('Detail', {id: props.id})}>
       {props.previewUrl !== undefined ? (
         <Image style={CardStyle.image} source={{uri: props.previewUrl}} />
       ) : (

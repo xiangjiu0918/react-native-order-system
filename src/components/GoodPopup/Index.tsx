@@ -6,21 +6,44 @@ import {
   Pressable,
   Dimensions,
   ScrollView,
-} from 'react-native';
-import React, {useEffect, useState, useRef} from 'react';
-import Icons from 'react-native-vector-icons/AntDesign';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Popup, {type BasePopupProp} from '@/components/Popup/Index';
-import AddressPopup from '@/components/AddressPopup/Index';
-import LoadPopup from '@/components/LoadPopup/Index';
-import PayPopup from '@/components/PayPopup/Index';
-import {useAppSelector, useAppDispatch} from '@/store/hooks';
-import {initList} from '@/store/slice/addressSlice';
-import {EventRegister} from 'react-native-event-listeners';
-import axios from '@/utils/axios';
+} from "react-native";
+import React, {useEffect, useState, useRef} from "react";
+import Icons from "react-native-vector-icons/AntDesign";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Popup, {type BasePopupProp} from "@/components/Popup/Index";
+import AddressPopup from "@/components/AddressPopup/Index";
+import LoadPopup from "@/components/LoadPopup/Index";
+import PayPopup from "@/components/PayPopup/Index";
+import {useAppSelector, useAppDispatch} from "@/store/hooks";
+import {initList} from "@/store/slice/addressSlice";
+import {EventRegister} from "react-native-event-listeners";
+import axios from "@/utils/axios";
 
+interface TypesItem {
+  id: number;
+  name: string;
+  thumbnailUrl: string;
+  stockout: boolean;
+}
+
+interface SizesItem {
+  id: number;
+  name: string;
+  stockout: boolean;
+}
+
+interface Categories {
+  [key: string]: {
+    inventory: number;
+    price: number;
+  };
+}
 interface GoodPopupProp extends BasePopupProp {
-  mode: 'preSelect' | 'purchase';
+  mode: "preSelect" | "purchase";
+  sizes: SizesItem[];
+  types: TypesItem[];
+  categories: Categories;
+  defaultPrice: number;
 }
 
 interface GoodMap {
@@ -33,7 +56,7 @@ interface GoodItem {
   num: number;
 }
 
-let {width: windowWidth, height: windowHeight} = Dimensions.get('window');
+let {width: windowWidth, height: windowHeight} = Dimensions.get("window");
 
 export default function GoodPopup(props: GoodPopupProp) {
   const {username} = useAppSelector(state => state.user);
@@ -50,62 +73,65 @@ export default function GoodPopup(props: GoodPopupProp) {
   const [addressVisible, changeAddressVisible] = useState(false);
   const [loadVisible, changeLoadVisible] = useState(false);
   const [payVisible, changePayVisible] = useState(false);
-  const id = '1';
+  const id = "1";
   const prefill = useRef<GoodMap>({});
-  const type = [
-    {
-      src: '@/static/defaultAvator.jpeg',
-      text: '红色上衣【单件】',
-      stockout: true,
-    },
-    {
-      src: '@/static/defaultAvator.jpeg',
-      text: '红色上衣【单件】',
-      stockout: false,
-    },
-    {
-      src: '@/static/defaultAvator.jpeg',
-      text: '红色上衣【单件】',
-      stockout: false,
-    },
-  ];
-  const size = [
-    {
-      text: 'S',
-      stockout: true,
-    },
-    {
-      text: 'S',
-      stockout: false,
-    },
-    {
-      text: 'S',
-      stockout: false,
-    },
-    {
-      text: 'S',
-      stockout: false,
-    },
-    {
-      text: 'S',
-      stockout: false,
-    },
-    {
-      text: 'S',
-      stockout: false,
-    },
-  ];
+  const {types, sizes, categories, defaultPrice} = props;
+  // const types = [
+  //   {
+  //     src: "@/static/defaultAvator.jpeg",
+  //     name: "红色上衣【单件】",
+  //     stockout: true,
+  //   },
+  //   {
+  //     src: "@/static/defaultAvator.jpeg",
+  //     name: "红色上衣【单件】",
+  //     stockout: false,
+  //   },
+  //   {
+  //     src: "@/static/defaultAvator.jpeg",
+  //     name: "红色上衣【单件】",
+  //     stockout: false,
+  //   },
+  // ];
+  // const sizes = [
+  //   {
+  //     name: "S",
+  //     stockout: true,
+  //   },
+  //   {
+  //     name: "S",
+  //     stockout: false,
+  //   },
+  //   {
+  //     name: "S",
+  //     stockout: false,
+  //   },
+  //   {
+  //     name: "S",
+  //     stockout: false,
+  //   },
+  //   {
+  //     name: "S",
+  //     stockout: false,
+  //   },
+  //   {
+  //     name: "S",
+  //     stockout: false,
+  //   },
+  // ];
   useEffect(() => {
-    axios.get('/addresses/default').then(res => {
-      const {address} = res.data?.data;
-      if (address?.default === true) {
-        changeSelectAddress(address);
-        dispatch(initList({list: [address], default: address.id}));
-      } else {
-        changeSelectAddress(address);
-        dispatch(initList({list: [address], default: null}));
-      }
-    });
+    if (global.token) {
+      axios.get("/addresses/default").then(res => {
+        const {address} = res.data?.data;
+        if (address?.default === true) {
+          changeSelectAddress(address);
+          dispatch(initList({list: [address], default: address.id}));
+        } else {
+          changeSelectAddress(address);
+          dispatch(initList({list: [address], default: null}));
+        }
+      });
+    }
   }, []);
   const handleAddressVisible = () => {
     changeAddressVisible(!addressVisible);
@@ -117,7 +143,7 @@ export default function GoodPopup(props: GoodPopupProp) {
     changePayVisible(!payVisible);
   };
   const getPreFilling = async () => {
-    const res = await AsyncStorage.getItem('pre-filling');
+    const res = await AsyncStorage.getItem("pre-filling");
     if (res !== null) {
       prefill.current = JSON.parse(res);
       const {num, typeIdx, sizeIdx} = prefill.current[id];
@@ -134,14 +160,14 @@ export default function GoodPopup(props: GoodPopupProp) {
         typeIdx: selectTypeIdx,
         num,
       };
-      AsyncStorage.setItem('pre-filling', JSON.stringify(prefill.current));
-      EventRegister.emitEvent('updatePreFill');
-      if (props.mode === 'purchase') handlePayVisible();
+      AsyncStorage.setItem("pre-filling", JSON.stringify(prefill.current));
+      EventRegister.emitEvent("updatePreFill");
+      if (props.mode === "purchase") handlePayVisible();
     }
   };
   useEffect(() => {
     getPreFilling();
-    let preFillListener = EventRegister.addEventListener('updatePreFill', () =>
+    let preFillListener = EventRegister.addEventListener("updatePreFill", () =>
       getPreFilling(),
     );
     return () => {
@@ -152,7 +178,7 @@ export default function GoodPopup(props: GoodPopupProp) {
     <>
       <Popup
         {...props}
-        btnText={props.mode === 'preSelect' ? '提交预选信息' : '立即下单'}
+        btnText={props.mode === "preSelect" ? "提交预选信息" : "立即下单"}
         btnCallBack={handleBtnPress}
         preventDefault={username === undefined}>
         {username !== undefined ? (
@@ -160,19 +186,19 @@ export default function GoodPopup(props: GoodPopupProp) {
             style={PopupStyle.addressWrap}
             onPress={handleAddressVisible}>
             <View
-              style={[PopupStyle.flexBox, {justifyContent: 'space-between'}]}>
+              style={[PopupStyle.flexBox, {justifyContent: "space-between"}]}>
               <View style={[PopupStyle.flexBox, {gap: 10}]}>
                 <Icons name="enviromento" size={20} color="black" />
                 <Text
                   style={{
                     fontSize: 15,
-                    color: 'black',
+                    color: "black",
                     height: 20,
                     lineHeight: 20,
                   }}>
                   {selectAddress
                     ? `${selectAddress.name} ${selectAddress.detail}`
-                    : '暂无收货地址'}
+                    : "暂无收货地址"}
                 </Text>
               </View>
               <Icons name="right" size={15} />
@@ -187,10 +213,10 @@ export default function GoodPopup(props: GoodPopupProp) {
             <Image
               style={PopupStyle.picture}
               resizeMode="contain"
-              source={require('@/static/defaultAvator.jpeg')}
+              source={require("@/static/defaultAvator.jpeg")}
             />
-            <View style={{justifyContent: 'space-between'}}>
-              <Text style={PopupStyle.price}>￥258</Text>
+            <View style={{justifyContent: "space-between"}}>
+              <Text style={PopupStyle.price}>￥{defaultPrice}</Text>
               <View style={PopupStyle.flexBox}>
                 <Pressable
                   disabled={num === 1}
@@ -204,7 +230,7 @@ export default function GoodPopup(props: GoodPopupProp) {
                 <View
                   style={[
                     PopupStyle.flexBox,
-                    {width: 50, justifyContent: 'center'},
+                    {width: 50, justifyContent: "center"},
                   ]}>
                   <Text>{num}</Text>
                 </View>
@@ -217,57 +243,71 @@ export default function GoodPopup(props: GoodPopupProp) {
               </View>
             </View>
           </View>
-          <Text style={PopupStyle.typeSizeTitle}>颜色分类（3）</Text>
-          <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: 'wrap'}]}>
-            {type.map((item, index) => (
-              <Pressable
-                key={index}
-                disabled={item.stockout}
-                style={[
-                  PopupStyle.flexBox,
-                  selectTypeIdx === index
-                    ? PopupStyle.typeWrapSelect
-                    : PopupStyle.typeWrap,
-                  item.stockout ? {opacity: 0.5} : {opacity: 1},
-                ]}
-                onPress={() => changeTypeIdx(index)}>
-                <Image
-                  style={{height: 30, width: 30}}
-                  resizeMode="contain"
-                  source={require('@/static/defaultAvator.jpeg')}
-                />
-                <Text
-                  style={[
-                    {paddingHorizontal: 10},
-                    selectTypeIdx === index
-                      ? {color: 'white'}
-                      : {color: 'black'},
-                  ]}>
-                  {item.text}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={PopupStyle.typeSizeTitle}>尺码</Text>
-          <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: 'wrap'}]}>
-            {size.map((item, index) => (
-              <Text
-                key={index}
-                disabled={item.stockout}
-                style={[
-                  PopupStyle.flexBox,
-                  selectSizeIdx === index
-                    ? PopupStyle.typeWrapSelect
-                    : PopupStyle.typeWrap,
-                  selectSizeIdx === index ? {color: 'white'} : {color: 'black'},
-                  item.stockout ? {opacity: 0.5} : {opacity: 1},
-                  {paddingHorizontal: 15, paddingVertical: 5},
-                ]}
-                onPress={() => changeSizeIdx(index)}>
-                {item.text}
-              </Text>
-            ))}
-          </View>
+          {types.length > 0 ? (
+            <>
+              <Text style={PopupStyle.typeSizeTitle}>颜色分类（3）</Text>
+              <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: "wrap"}]}>
+                {types.map((item, index) => (
+                  <Pressable
+                    key={index}
+                    disabled={item.stockout}
+                    style={[
+                      PopupStyle.flexBox,
+                      selectTypeIdx === index
+                        ? PopupStyle.typeWrapSelect
+                        : PopupStyle.typeWrap,
+                      item.stockout ? {opacity: 0.5} : {opacity: 1},
+                    ]}
+                    onPress={() => changeTypeIdx(index)}>
+                    <Image
+                      style={{height: 30, width: 30}}
+                      resizeMode="contain"
+                      source={{uri: item.thumbnailUrl}}
+                    />
+                    <Text
+                      style={[
+                        {maxWidth: windowWidth - 60, paddingHorizontal: 10},
+                        selectTypeIdx === index
+                          ? {color: "white"}
+                          : {color: "black"},
+                      ]}>
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : (
+            <></>
+          )}
+          {sizes.length > 0 ? (
+            <>
+              <Text style={PopupStyle.typeSizeTitle}>尺码</Text>
+              <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: "wrap"}]}>
+                {sizes.map((item, index) => (
+                  <Text
+                    key={index}
+                    disabled={item.stockout}
+                    style={[
+                      PopupStyle.flexBox,
+                      selectSizeIdx === index
+                        ? PopupStyle.typeWrapSelect
+                        : PopupStyle.typeWrap,
+                      selectSizeIdx === index
+                        ? {color: "white"}
+                        : {color: "black"},
+                      item.stockout ? {opacity: 0.5} : {opacity: 1},
+                      {paddingHorizontal: 15, paddingVertical: 5},
+                    ]}
+                    onPress={() => changeSizeIdx(index)}>
+                    {item.name}
+                  </Text>
+                ))}
+              </View>
+            </>
+          ) : (
+            <></>
+          )}
         </ScrollView>
       </Popup>
       <AddressPopup
@@ -285,34 +325,34 @@ export default function GoodPopup(props: GoodPopupProp) {
 const PopupStyle = StyleSheet.create({
   wrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
   },
   container: {
     width: windowWidth,
     height: 700,
-    backgroundColor: '#eeeeee',
+    backgroundColor: "#eeeeee",
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
   },
   modal: {
     width: windowWidth,
     height: windowHeight,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    position: 'absolute',
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    position: "absolute",
   },
   topBar: {
     height: 40,
-    flexDirection: 'row',
+    flexDirection: "row",
     width: windowWidth,
-    justifyContent: 'center',
-    position: 'relative',
-    backgroundColor: 'white',
+    justifyContent: "center",
+    position: "relative",
+    backgroundColor: "white",
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
   },
   close: {
-    position: 'absolute',
+    position: "absolute",
     right: 15,
     paddingTop: 15,
   },
@@ -321,26 +361,26 @@ const PopupStyle = StyleSheet.create({
     marginTop: 15,
   },
   addressWrap: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     paddingHorizontal: 20,
     paddingVertical: 10,
     gap: 5,
     marginBottom: 10,
   },
   flexBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   selectDetailWrap: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 15,
     flex: 1,
     gap: 10,
   },
   pictureNumWrap: {
     height: 80,
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: 10,
   },
   picture: {
@@ -349,38 +389,38 @@ const PopupStyle = StyleSheet.create({
     borderRadius: 5,
   },
   price: {
-    color: '#ff6f43',
+    color: "#ff6f43",
     fontSize: 25,
-    fontWeight: '500',
+    fontWeight: "500",
     lineHeight: 25,
   },
   numBtn: {
     height: 30,
     width: 30,
-    backgroundColor: '#f1f1f1',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f1f1f1",
+    justifyContent: "center",
+    alignItems: "center",
     borderRadius: 5,
   },
   typeWrap: {
     borderRadius: 5,
-    overflow: 'hidden',
-    backgroundColor: '#f1f1f1',
+    overflow: "hidden",
+    backgroundColor: "#f1f1f1",
   },
   typeWrapSelect: {
     borderRadius: 5,
-    overflow: 'hidden',
-    backgroundColor: '#ff6f43',
+    overflow: "hidden",
+    backgroundColor: "#ff6f43",
   },
   typeSizeTitle: {
-    color: 'black',
-    fontWeight: '600',
+    color: "black",
+    fontWeight: "600",
   },
   button: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     width: windowWidth - 30,
-    backgroundColor: '#ff6f43',
+    backgroundColor: "#ff6f43",
     paddingVertical: 10,
     borderRadius: 20,
   },

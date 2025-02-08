@@ -11,7 +11,7 @@
             "name": "test",
             "runtimeExecutable": "npx",
             "runtimeArgs": ["jest"],
-            "protocol": "inspector"
+            // "protocol": "inspector"
         }
         
     ]
