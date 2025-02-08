@@ -1,31 +1,31 @@
 import {
   View,
+  ScrollView,
   Text,
   StyleSheet,
   useWindowDimensions,
   StatusBar,
   Pressable,
-  Alert,
-} from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
-import React, {useEffect, useState} from 'react';
-import {useHeaderHeight} from '@react-navigation/elements';
-import Icons from 'react-native-vector-icons/AntDesign';
-import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {EventRegister} from 'react-native-event-listeners';
-import axios from '@/utils/axios';
-import {useAppSelector, useAppDispatch} from '@/store/hooks';
-import {initList} from '@/store/slice/addressSlice';
+} from "react-native";
+import Clipboard from "@react-native-clipboard/clipboard";
+import React, {useEffect, useState} from "react";
+import {useHeaderHeight} from "@react-navigation/elements";
+import Icons from "react-native-vector-icons/AntDesign";
+import {useNavigation} from "@react-navigation/native";
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
+import {EventRegister} from "react-native-event-listeners";
+import axios from "@/utils/axios";
+import {useAppSelector, useAppDispatch} from "@/store/hooks";
+import {initList} from "@/store/slice/addressSlice";
 import {
   AddressStore,
   changeItem,
   deleteItem,
   changeDefault,
   selectAddress,
-} from '@/store/slice/addressSlice';
-import CheckBox from '@react-native-community/checkbox';
-import alert from '@/utils/alert';
+} from "@/store/slice/addressSlice";
+import CheckBox from "@react-native-community/checkbox";
+import alert from "@/utils/alert";
 
 export default function AddressItem({
   selectItem,
@@ -42,21 +42,23 @@ export default function AddressItem({
     (StatusBar.currentHeight || 0);
   const [manageMode, switchMode] = useState(false);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  EventRegister.addEventListener('manageAddress', () => switchMode(true));
-  EventRegister.addEventListener('existManage', () => switchMode(false));
+  EventRegister.addEventListener("manageAddress", () => switchMode(true));
+  EventRegister.addEventListener("existManage", () => switchMode(false));
   useEffect(() => {
     initAddress();
   }, []);
   function initAddress() {
-    axios.get('/addresses').then(
+    axios.get("/addresses").then(
       res => {
         const {addresses: list, defaultId} = res.data?.data;
-        dispatch(
-          initList({
-            list,
-            default: defaultId,
-          }),
-        );
+        if (list.length > 0) {
+          dispatch(
+            initList({
+              list,
+              default: defaultId,
+            }),
+          );
+        }
       },
       err => {
         alert();
@@ -65,7 +67,7 @@ export default function AddressItem({
   }
   function handleEdit(address: AddressStore) {
     return () => {
-      navigation.navigate('AddAddress', address);
+      navigation.navigate("AddAddress", address);
     };
   }
   function handleDefault(id: number) {
@@ -83,11 +85,11 @@ export default function AddressItem({
     };
   }
   return (
-    <View style={AddressStyle.container}>
+    <ScrollView style={AddressStyle.container}>
       {address.list.length > 0 ? (
         <></>
       ) : (
-        <View style={[AddressStyle.empty, {height}]}>
+        <View style={[AddressStyle.empty]}>
           <Text>暂无收货人信息</Text>
         </View>
       )}
@@ -96,7 +98,7 @@ export default function AddressItem({
           key={item.id}
           style={[
             AddressStyle.item,
-            item.id === selectItem?.id ? {backgroundColor: '#fff1eb'} : {},
+            item.id === selectItem?.id ? {backgroundColor: "#fff1eb"} : {},
           ]}
           onPress={() => changeSelectItem && changeSelectItem(item)}>
           <View style={AddressStyle.abstract}>
@@ -104,14 +106,14 @@ export default function AddressItem({
               <Text
                 style={[
                   AddressStyle.distinct,
-                  item.id === selectItem?.id ? {color: '#ff6600'} : {},
+                  item.id === selectItem?.id ? {color: "#ff6600"} : {},
                 ]}>
-                {item.district.join(' ')}
+                {item.district.join(" ")}
               </Text>
               <Text
                 style={[
                   AddressStyle.mainText,
-                  item.id === selectItem?.id ? {color: '#ff6600'} : {},
+                  item.id === selectItem?.id ? {color: "#ff6600"} : {},
                 ]}>
                 {item.detail}
               </Text>
@@ -119,14 +121,14 @@ export default function AddressItem({
                 <Text
                   style={[
                     AddressStyle.nameTel,
-                    item.id === selectItem?.id ? {color: '#ff6600'} : {},
+                    item.id === selectItem?.id ? {color: "#ff6600"} : {},
                   ]}>
                   {item.name}
                 </Text>
                 <Text
                   style={[
                     AddressStyle.nameTel,
-                    item.id === selectItem?.id ? {color: '#ff6600'} : {},
+                    item.id === selectItem?.id ? {color: "#ff6600"} : {},
                   ]}>
                   {item.tel}
                 </Text>
@@ -166,71 +168,72 @@ export default function AddressItem({
           )}
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const AddressStyle = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     flex: 1,
   },
   empty: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 200,
   },
   item: {
     paddingHorizontal: 20,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderColor: '#eeeeee',
+    borderColor: "#eeeeee",
   },
   abstract: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   line: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   distinct: {
     fontSize: 12,
   },
   mainText: {
-    color: 'black',
-    fontWeight: '500',
+    color: "black",
+    fontWeight: "500",
   },
   nameTel: {
-    color: '#3c3c3c',
+    color: "#3c3c3c",
     fontSize: 13,
   },
   default: {
-    backgroundColor: '#feddc7',
-    color: '#ff6600',
+    backgroundColor: "#feddc7",
+    color: "#ff6600",
     fontSize: 10,
     paddingVertical: 2,
     paddingHorizontal: 5,
     borderRadius: 5,
   },
   manageBar: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 10,
   },
   button: {
-    backgroundColor: '#f1f1f1',
+    backgroundColor: "#f1f1f1",
     paddingHorizontal: 5,
     borderRadius: 5,
   },
   btnText: {
-    color: 'black',
+    color: "black",
     paddingHorizontal: 5,
     paddingVertical: 3,
   },

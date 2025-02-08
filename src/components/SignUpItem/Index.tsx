@@ -6,15 +6,16 @@ import {
   Pressable,
   ToastAndroid,
   Animated,
-} from 'react-native';
-import {SvgXml} from 'react-native-svg';
-import React, {useEffect, useState, useRef} from 'react';
-import {useNavigation} from '@react-navigation/native';
-import {type NativeStackNavigationProp} from '@react-navigation/native-stack';
-import qs from 'qs';
-import axios from '@/utils/axios';
+} from "react-native";
+import {SvgXml} from "react-native-svg";
+import React, {useEffect, useState, useRef} from "react";
+import {useNavigation} from "@react-navigation/native";
+import {type NativeStackNavigationProp} from "@react-navigation/native-stack";
+import qs from "qs";
+import axios from "@/utils/axios";
 // import axios from 'axios';
-import {responseType} from '@/types';
+import {responseType} from "@/types";
+import alert from "@/utils/alert";
 
 interface captchaType extends responseType {
   data: {
@@ -24,13 +25,13 @@ interface captchaType extends responseType {
 }
 
 export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
-  const [username, onChangeUsername] = useState('');
-  const [email, onChangeEmail] = useState('');
-  const [pwd, onChangePwd] = useState('');
-  const [confirmPwd, onChangeConfirmPwd] = useState('');
-  const [captcha, onChangeCaptcha] = useState('');
-  const [xml, onChangeXml] = useState('');
-  const captchaKey = useRef('');
+  const [username, onChangeUsername] = useState("");
+  const [email, onChangeEmail] = useState("");
+  const [pwd, onChangePwd] = useState("");
+  const [confirmPwd, onChangeConfirmPwd] = useState("");
+  const [captcha, onChangeCaptcha] = useState("");
+  const [xml, onChangeXml] = useState("");
+  const captchaKey = useRef("");
   const animation = useRef(new Animated.Value(0)).current;
   const [nameHighlight, setNameHighlight] = useState(false);
   const [nameWarn, setNameWarn] = useState<string[]>([]);
@@ -42,13 +43,13 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
   const [captchaHighlight, setCaptchaHighlight] = useState(false);
   const [captchaWarn, setCaptchaWarn] = useState<string[]>([]);
   useEffect(() => {
-    axios.get('/captcha').then(
+    axios.get("/captcha").then(
       ({data}: {data: captchaType}) => {
         onChangeXml(data.data.captchaData);
         captchaKey.current = data.data.captchaKey;
       },
       (err: any) => {
-        console.log('err', err);
+        console.log("err", err);
       },
     );
     return () => {};
@@ -95,42 +96,48 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
         captchaText: captcha,
       });
       axios
-        .post('/users/sign_up', params, {
+        .post("/users/sign_up", params, {
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
           },
         })
         .then(
           res => {
-            ToastAndroid.show('注册成功', ToastAndroid.SHORT);
+            ToastAndroid.show("注册成功", ToastAndroid.SHORT);
             if (handleSignUp) {
               handleSignUp();
             }
           },
           err => {
-            console.log('err', err);
+            console.log("err", err);
+            let matchErr = false;
             err.response.data.errors.forEach((e: string) => {
               if (e.match(/用户名/)) {
+                matchErr = true;
                 const newWarn = [...nameWarn, e];
                 setNameWarn(newWarn);
                 setNameHighlight(true);
               }
               if (e.match(/邮箱/)) {
+                matchErr = true;
                 const newWarn = [...emailWarn, e];
                 setEmailWarn(newWarn);
                 setEmailHighlight(true);
               }
               if (e.match(/密码/)) {
+                matchErr = true;
                 const newWarn = [...pwdWarn, e];
                 setPwdWarn(newWarn);
                 setPwdHighlight(true);
               }
               if (e.match(/验证码/)) {
+                matchErr = true;
                 const newWarn = [...captchaWarn, e];
                 setCaptchaWarn(newWarn);
                 setCaptchaHighlight(true);
               }
             });
+            if (matchErr === false) alert();
           },
         );
     }
@@ -139,22 +146,22 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
   function resetState(type: string) {
     return () => {
       switch (type) {
-        case 'name':
+        case "name":
           setNameHighlight(false);
           setNameWarn([]);
           break;
-        case 'email':
+        case "email":
           setEmailHighlight(false);
           setEmailWarn([]);
           break;
-        case 'pwd':
+        case "pwd":
           setPwdHighlight(false);
           setPwdWarn([]);
           break;
-        case 'confPwd':
+        case "confPwd":
           setConfPwdHighlight(false);
           break;
-        case 'captcha':
+        case "captcha":
           setCaptchaHighlight(false);
           setCaptchaWarn([]);
           break;
@@ -180,12 +187,12 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
           <TextInput
             style={[
               SignUpStyle.input,
-              nameHighlight ? {borderColor: 'red'} : {},
+              nameHighlight ? {borderColor: "red"} : {},
             ]}
             value={username}
             onChangeText={onChangeUsername}
             placeholder="请输入用户名"
-            onFocus={resetState('name')}
+            onFocus={resetState("name")}
           />
           {nameHighlight ? (
             nameWarn.map((w, index) => (
@@ -204,12 +211,12 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
           <TextInput
             style={[
               SignUpStyle.input,
-              emailHighlight ? {borderColor: 'red'} : {},
+              emailHighlight ? {borderColor: "red"} : {},
             ]}
             value={email}
             onChangeText={onChangeEmail}
             placeholder="请输入邮箱"
-            onFocus={resetState('email')}
+            onFocus={resetState("email")}
           />
           {emailHighlight ? (
             emailWarn.map((w, index) => (
@@ -228,12 +235,12 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
           <TextInput
             style={[
               SignUpStyle.input,
-              pwdHighlight ? {borderColor: 'red'} : {},
+              pwdHighlight ? {borderColor: "red"} : {},
             ]}
             value={pwd}
             onChangeText={onChangePwd}
             placeholder="请输入密码"
-            onFocus={resetState('pwd')}
+            onFocus={resetState("pwd")}
           />
           {pwdHighlight ? (
             pwdWarn.map((w, index) => (
@@ -252,13 +259,13 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
           <TextInput
             style={[
               SignUpStyle.input,
-              confPwdHighlight ? {borderColor: 'red'} : {},
+              confPwdHighlight ? {borderColor: "red"} : {},
             ]}
             value={confirmPwd}
             onChangeText={onChangeConfirmPwd}
             onBlur={verifyPwdSame}
             placeholder="请再次确认密码"
-            onFocus={resetState('confPwd')}
+            onFocus={resetState("confPwd")}
           />
           {confPwdHighlight ? (
             <Text style={SignUpStyle.highlight}>两次输入密码不一致</Text>
@@ -272,22 +279,22 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
         <View>
           <View
             style={{
-              flexDirection: 'row',
+              flexDirection: "row",
               width: 200,
-              justifyContent: 'space-between',
+              justifyContent: "space-between",
             }}>
             <TextInput
               style={[
                 SignUpStyle.input,
                 {width: 110},
-                captchaHighlight ? {borderColor: 'red'} : {},
+                captchaHighlight ? {borderColor: "red"} : {},
               ]}
               value={captcha}
               onChangeText={onChangeCaptcha}
-              onFocus={resetState('captcha')}
+              onFocus={resetState("captcha")}
               placeholder="请输入验证码"
             />
-            {xml !== '' ? <SvgXml xml={xml} width="100" height="40" /> : <></>}
+            {xml !== "" ? <SvgXml xml={xml} width="100" height="40" /> : <></>}
           </View>
           {captchaHighlight ? (
             captchaWarn.map((w, index) => (
@@ -309,19 +316,19 @@ export default function SignUp({handleSignUp}: {handleSignUp?: () => void}) {
 
 const SignUpStyle = StyleSheet.create({
   container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     flex: 1,
   },
   flexBoxC: {
     width: 320,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
   input: {
     width: 200,
@@ -331,32 +338,32 @@ const SignUpStyle = StyleSheet.create({
     padding: 10,
   },
   highlight: {
-    color: 'red',
+    color: "red",
   },
   signUpBtn: {
     width: 320,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 10,
     borderRadius: 5,
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   signUpText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
   label: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 18,
     lineHeight: 40,
     height: 40,
   },
   remark: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   signUp: {
-    color: '#2196F3',
-    textDecorationLine: 'underline',
+    color: "#2196F3",
+    textDecorationLine: "underline",
   },
   image: {
     width: 50,

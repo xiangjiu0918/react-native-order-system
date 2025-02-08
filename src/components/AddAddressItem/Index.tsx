@@ -5,22 +5,22 @@ import {
   StyleSheet,
   Pressable,
   ToastAndroid,
-} from 'react-native';
-import React, {useEffect, useState, useRef} from 'react';
-import CheckBox from '@react-native-community/checkbox';
-import {NavigationProp} from '@react-navigation/native';
-import axios from '@/utils/axios';
-import {Picker, Provider} from '@ant-design/react-native';
-import {Md5} from 'ts-md5';
+} from "react-native";
+import React, {useEffect, useState, useRef} from "react";
+import CheckBox from "@react-native-community/checkbox";
+import {NavigationProp} from "@react-navigation/native";
+import axios from "@/utils/axios";
+import {Picker, Provider} from "@ant-design/react-native";
+import {Md5} from "ts-md5";
 import {
   addItem,
   changeItem,
   type Address,
   type AddressStore,
-} from '@/store/slice/addressSlice';
-import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {EventRegister} from 'react-native-event-listeners';
-import alert from '@/utils/alert';
+} from "@/store/slice/addressSlice";
+import {useAppDispatch, useAppSelector} from "@/store/hooks";
+import {EventRegister} from "react-native-event-listeners";
+import alert from "@/utils/alert";
 
 interface districtOption {
   value: string;
@@ -32,14 +32,17 @@ export default function AddAddress(props: {
   navigation?: NavigationProp<any>;
   route?: {params: AddressStore};
   showBtn: boolean;
+  handleClose?: () => void;
 }) {
   const {navigation} = props;
   const payload = props.route?.params;
   const [isDefault, switchDefault] = useState(payload?.default || false);
-  const [name, changeName] = useState(payload?.name || '');
-  const [tel, changeTel] = useState(payload?.tel || '');
+  const [name, changeName] = useState(payload?.name || "");
+  const [tel, changeTel] = useState(payload?.tel || "");
   const [district, changeDistrict] = useState(payload?.district || []);
-  const [detail, changeDetail] = useState(payload?.detail || '');
+  const [detail, changeDetail] = useState(payload?.detail || "");
+  const [telWarn, setTelWarn] = useState<string[]>([]);
+  const [telHighlight, setTelHighlight] = useState(false);
   const address = useAppSelector(state => state.address);
   const dispatch = useAppDispatch();
   const [districtList, setList] = useState([] as districtOption[]);
@@ -65,21 +68,32 @@ export default function AddAddress(props: {
       default: isDefault,
     };
     if (payload === undefined) {
-      axios.post('/addresses', payloadBase).then(
+      axios.post("/addresses", payloadBase).then(
         res => {
           dispatch(addItem(payloadBase));
-          ToastAndroid.show('添加成功', ToastAndroid.SHORT);
+          ToastAndroid.show("添加成功", ToastAndroid.SHORT);
+          if (props.handleClose) props.handleClose();
+          else navigation?.goBack();
         },
         err => {
-          console.log('err', err);
-          alert();
+          console.log("err", err);
+          let matchErr = false;
+          err.response.data.errors.forEach((e: string) => {
+            if (e.match(/手机号/)) {
+              matchErr = true;
+              const newWarn = [...telWarn, e];
+              setTelWarn(newWarn);
+              setTelHighlight(true);
+            }
+          });
+          if (matchErr === false) alert();
         },
       );
     } else {
       axios
         .put(`/addresses/${payload.id}`, payloadBase, {
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
           },
         })
         .then(
@@ -89,27 +103,45 @@ export default function AddAddress(props: {
               id: payload.id,
             };
             dispatch(changeItem(payloadWithId));
-            ToastAndroid.show('修改成功', ToastAndroid.SHORT);
+            ToastAndroid.show("修改成功", ToastAndroid.SHORT);
+            if (props.handleClose) props.handleClose();
+            else navigation?.goBack();
           },
           err => {
-            alert();
+            console.log("err", err);
+            let matchErr = false;
+            err.response.data.errors.forEach((e: string) => {
+              if (e.match(/手机号/)) {
+                matchErr = true;
+                const newWarn = [...telWarn, e];
+                setTelWarn(newWarn);
+                setTelHighlight(true);
+              }
+            });
+            if (matchErr === false) alert();
           },
         );
     }
-    if (props.showBtn === true) {
-      // 说明是全屏模式
-      navigation?.goBack();
-    }
   }
   btnCallBack.current = submit;
+  function resetState(type: string) {
+    return () => {
+      switch (type) {
+        case "tel":
+          setTelHighlight(false);
+          setTelWarn([]);
+          break;
+      }
+    };
+  }
   useEffect(() => {
-    let submitListener = EventRegister.addEventListener('submit', () =>
+    let submitListener = EventRegister.addEventListener("submit", () =>
       btnCallBack.current(),
     );
     const sig = Md5.hashStr(
-      '/ws/district/v1/list?key=U3MBZ-EXWCT-2L2X2-VDRMF-WRVH2-QXF3M&struct_type=1nigx3vilUvqIpiA99xdSDpKyQurO8OEH',
+      "/ws/district/v1/list?key=U3MBZ-EXWCT-2L2X2-VDRMF-WRVH2-QXF3M&struct_type=1nigx3vilUvqIpiA99xdSDpKyQurO8OEH",
     ).toLowerCase();
-    axios.get('/addresses/district/list').then(
+    axios.get("/addresses/district/list").then(
       res => {
         setList(transDistrict(res.data?.data?.list));
       },
@@ -132,7 +164,7 @@ export default function AddAddress(props: {
         <View style={AddAddressStyle.line}>
           <View style={AddAddressStyle.label}>
             <Text>收件人</Text>
-            <Text style={{color: 'red'}}>*</Text>
+            <Text style={{color: "red"}}>*</Text>
           </View>
           <TextInput
             style={AddAddressStyle.input}
@@ -144,19 +176,40 @@ export default function AddAddress(props: {
         <View style={AddAddressStyle.line}>
           <View style={AddAddressStyle.label}>
             <Text>手机号</Text>
-            <Text style={{color: 'red'}}>*</Text>
+            <Text style={{color: "red"}}>*</Text>
           </View>
-          <TextInput
+          {/* <TextInput
             style={AddAddressStyle.input}
             value={tel}
             onChangeText={changeTel}
             placeholder="手机号"
-          />
+          /> */}
+          <View style={{width: 280}}>
+            <TextInput
+              style={[
+                AddAddressStyle.input,
+                telHighlight ? {borderColor: "red"} : {},
+              ]}
+              value={tel}
+              onChangeText={changeTel}
+              placeholder="请输入密码"
+              onFocus={resetState("pwd")}
+            />
+            {telHighlight ? (
+              telWarn.map((w, index) => (
+                <Text key={index} style={AddAddressStyle.highlight}>
+                  {w}
+                </Text>
+              ))
+            ) : (
+              <></>
+            )}
+          </View>
         </View>
         <View style={AddAddressStyle.line}>
           <View style={AddAddressStyle.label}>
             <Text>所在地区</Text>
-            <Text style={{color: 'red'}}>*</Text>
+            <Text style={{color: "red"}}>*</Text>
           </View>
           <Picker
             data={districtList}
@@ -164,14 +217,14 @@ export default function AddAddress(props: {
             value={district}
             onChange={changeDistrict}>
             <Text style={AddAddressStyle.input}>
-              {district.length > 0 ? district.join(' ') : '省、市、区、街道'}
+              {district.length > 0 ? district.join(" ") : "省、市、区、街道"}
             </Text>
           </Picker>
         </View>
         <View style={AddAddressStyle.line}>
           <View style={AddAddressStyle.label}>
             <Text>详细地址</Text>
-            <Text style={{color: 'red'}}>*</Text>
+            <Text style={{color: "red"}}>*</Text>
           </View>
           <TextInput
             style={AddAddressStyle.input}
@@ -194,39 +247,42 @@ export default function AddAddress(props: {
 
 const AddAddressStyle = StyleSheet.create({
   container: {
-    display: 'flex',
+    display: "flex",
     padding: 20,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: "#f8f8f8",
     gap: 10,
     flex: 1,
   },
   line: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   label: {
-    display: 'flex',
-    flexDirection: 'row',
+    display: "flex",
+    flexDirection: "row",
   },
   input: {
     width: 280,
     height: 40,
-    backgroundColor: '#efefef',
+    backgroundColor: "#efefef",
     borderRadius: 5,
     padding: 10,
   },
   loadBtn: {
     paddingVertical: 10,
     borderRadius: 5,
-    backgroundColor: '#2196F3',
-    display: 'flex',
-    alignItems: 'center',
+    backgroundColor: "#2196F3",
+    display: "flex",
+    alignItems: "center",
     marginTop: 10,
   },
   loadText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
+  },
+  highlight: {
+    color: "red",
   },
 });

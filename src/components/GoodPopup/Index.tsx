@@ -6,6 +6,7 @@ import {
   Pressable,
   Dimensions,
   ScrollView,
+  ToastAndroid,
 } from "react-native";
 import React, {useEffect, useState, useRef} from "react";
 import Icons from "react-native-vector-icons/AntDesign";
@@ -40,10 +41,12 @@ interface Categories {
 }
 interface GoodPopupProp extends BasePopupProp {
   mode: "preSelect" | "purchase";
+  id: number;
   sizes: SizesItem[];
   types: TypesItem[];
   categories: Categories;
   defaultPrice: number;
+  defaultThumbnail: string;
 }
 
 interface GoodMap {
@@ -51,88 +54,64 @@ interface GoodMap {
 }
 
 interface GoodItem {
-  typeIdx: number;
-  sizeIdx: number;
+  typeId: number;
+  sizeId: number;
   num: number;
 }
 
 let {width: windowWidth, height: windowHeight} = Dimensions.get("window");
 
 export default function GoodPopup(props: GoodPopupProp) {
-  const {username} = useAppSelector(state => state.user);
+  const {username, userId} = useAppSelector(state => state.user);
   const dispatch = useAppDispatch();
   const address = useAppSelector(state => state.address);
+  const [types, changeTypes] = useState(props.types);
+  const [sizes, changeSizes] = useState(props.sizes);
+  const [price, changePrice] = useState(props.defaultPrice);
   const [selectAddress, changeSelectAddress] = useState(
     address.default === null
       ? address.list[0]
       : address.list.find(item => item.id === address.default),
   );
-  const [selectTypeIdx, changeTypeIdx] = useState(-1);
-  const [selectSizeIdx, changeSizeIdx] = useState(-1);
+  const [selectTypeId, changeTypeId] = useState(-1);
+  const [selectSizeId, changeSizeId] = useState(-1);
   const [num, changeNum] = useState(1);
   const [addressVisible, changeAddressVisible] = useState(false);
   const [loadVisible, changeLoadVisible] = useState(false);
   const [payVisible, changePayVisible] = useState(false);
   const id = "1";
   const prefill = useRef<GoodMap>({});
-  const {types, sizes, categories, defaultPrice} = props;
-  // const types = [
-  //   {
-  //     src: "@/static/defaultAvator.jpeg",
-  //     name: "红色上衣【单件】",
-  //     stockout: true,
-  //   },
-  //   {
-  //     src: "@/static/defaultAvator.jpeg",
-  //     name: "红色上衣【单件】",
-  //     stockout: false,
-  //   },
-  //   {
-  //     src: "@/static/defaultAvator.jpeg",
-  //     name: "红色上衣【单件】",
-  //     stockout: false,
-  //   },
-  // ];
-  // const sizes = [
-  //   {
-  //     name: "S",
-  //     stockout: true,
-  //   },
-  //   {
-  //     name: "S",
-  //     stockout: false,
-  //   },
-  //   {
-  //     name: "S",
-  //     stockout: false,
-  //   },
-  //   {
-  //     name: "S",
-  //     stockout: false,
-  //   },
-  //   {
-  //     name: "S",
-  //     stockout: false,
-  //   },
-  //   {
-  //     name: "S",
-  //     stockout: false,
-  //   },
-  // ];
+  const {categories} = props;
   useEffect(() => {
     if (global.token) {
       axios.get("/addresses/default").then(res => {
         const {address} = res.data?.data;
-        if (address?.default === true) {
-          changeSelectAddress(address);
-          dispatch(initList({list: [address], default: address.id}));
-        } else {
-          changeSelectAddress(address);
-          dispatch(initList({list: [address], default: null}));
+        if (address !== null) {
+          if (address?.default === true) {
+            changeSelectAddress(address);
+            dispatch(initList({list: [address], default: address.id}));
+          } else {
+            changeSelectAddress(address);
+            dispatch(initList({list: [address], default: null}));
+          }
         }
       });
     }
+    getPreFilling();
+    let preFillListener = EventRegister.addEventListener("updatePreFill", () =>
+      getPreFilling(),
+    );
+    return () => {
+      EventRegister.removeEventListener(preFillListener as string);
+    };
   }, []);
+  useEffect(() => {
+    // useState初始化时，商品接口还没返回数据，所以state初始化为空
+    // 要在接口返回数据后重新初始化
+    changeTypes(props.types);
+    changeSizes(props.sizes);
+    changePrice(props.defaultPrice);
+  }, [props]);
   const handleAddressVisible = () => {
     changeAddressVisible(!addressVisible);
   };
@@ -143,37 +122,141 @@ export default function GoodPopup(props: GoodPopupProp) {
     changePayVisible(!payVisible);
   };
   const getPreFilling = async () => {
-    const res = await AsyncStorage.getItem("pre-filling");
+    // 预选信息和用户id、商品id有关
+    const res = await AsyncStorage.getItem(`pre-filling:${userId}:${id}`);
     if (res !== null) {
       prefill.current = JSON.parse(res);
-      const {num, typeIdx, sizeIdx} = prefill.current[id];
+      const {num, typeId, sizeId} = prefill.current[id];
       changeNum(num);
-      changeTypeIdx(typeIdx);
-      changeSizeIdx(sizeIdx);
+      changeTypeId(typeId);
+      changeSizeId(sizeId);
     }
   };
   const handleBtnPress = () => {
-    if (username === undefined) handleLoadVisible();
+    if (username === undefined || selectAddress === undefined)
+      handleLoadVisible();
     else {
       prefill.current[id] = {
-        sizeIdx: selectSizeIdx,
-        typeIdx: selectTypeIdx,
+        sizeId: selectSizeId,
+        typeId: selectTypeId,
         num,
       };
-      AsyncStorage.setItem("pre-filling", JSON.stringify(prefill.current));
+      AsyncStorage.setItem(
+        `pre-filling:${userId}:${id}`,
+        JSON.stringify(prefill.current),
+      );
       EventRegister.emitEvent("updatePreFill");
       if (props.mode === "purchase") handlePayVisible();
     }
   };
-  useEffect(() => {
-    getPreFilling();
-    let preFillListener = EventRegister.addEventListener("updatePreFill", () =>
-      getPreFilling(),
-    );
+  const handlePressType = (typeId: number) => {
+    // 根据选择的商品类型判断size是否可选
     return () => {
-      EventRegister.removeEventListener(preFillListener as string);
+      if (selectTypeId === typeId) {
+        // 取消逻辑
+        changeTypeId(-1);
+        // 改回默认价格
+        changePrice(props.defaultPrice);
+        if (selectSizeId === -1) {
+          // 展示接口传来的size和type
+          changeTypes(props.types);
+          changeSizes(props.sizes);
+        } else {
+          // 展示单选size的结果
+          const newTypes = types.map(item => {
+            return {
+              ...item,
+              stockout:
+                categories[`${item.id}:${selectSizeId}`].inventory <= 0
+                  ? true
+                  : false,
+            };
+          });
+          changeTypes(newTypes);
+          changeSizes(props.sizes);
+        }
+      } else {
+        // 只有单选types时才需要过滤size，因为已经选择的size一定是可选的
+        if (sizes.length > 0 && selectSizeId === -1) {
+          const newSizes = sizes.map(item => {
+            return {
+              ...item,
+              stockout:
+                categories[`${typeId}:${item.id}`].inventory <= 0
+                  ? true
+                  : false,
+            };
+          });
+          changeSizes(newSizes);
+        } else {
+          // 修改价格
+          changePrice(categories[`${typeId}:${selectSizeId}`].price);
+        }
+        changeTypeId(typeId);
+      }
     };
-  }, []);
+  };
+  const handlePressSize = (sizeId: number) => {
+    // 根据选择的商品类型判断size是否可选
+    return () => {
+      if (selectSizeId === sizeId) {
+        // 取消逻辑
+        changeSizeId(-1);
+        // 改回默认价格
+        changePrice(props.defaultPrice);
+        if (selectTypeId === -1) {
+          // 展示接口传来的size和type
+          changeTypes(props.types);
+          changeSizes(props.sizes);
+        } else {
+          // 展示及单选Type的结果
+          const newSizes = sizes.map(item => {
+            return {
+              ...item,
+              stockout:
+                categories[`${selectTypeId}:${item.id}`].inventory <= 0
+                  ? true
+                  : false,
+            };
+          });
+          changeTypes(props.types);
+          changeSizes(newSizes);
+        }
+      } else {
+        if (types.length > 0 && selectTypeId === -1) {
+          const newTypes = types.map(item => {
+            return {
+              ...item,
+              stockout:
+                categories[`${item.id}:${sizeId}`].inventory <= 0
+                  ? true
+                  : false,
+            };
+          });
+          changeTypes(newTypes);
+        } else {
+          // 修改价格
+          changePrice(categories[`${selectTypeId}:${sizeId}`].price);
+        }
+        changeSizeId(sizeId);
+      }
+    };
+  };
+  const addNum = () => {
+    if (
+      (types.length > 0 && selectTypeId === -1) ||
+      (sizes.length > 0 && selectSizeId === -1)
+    ) {
+      // 没有选全参数，不能增加数量
+      ToastAndroid.show("请选择商品分类", ToastAndroid.SHORT);
+    } else {
+      if (num < categories[`${selectTypeId}:${selectSizeId}`].price) {
+        changeNum(num + 1);
+      } else {
+        ToastAndroid.show("数量已达上限", ToastAndroid.SHORT);
+      }
+    }
+  };
   return (
     <>
       <Popup
@@ -213,10 +296,10 @@ export default function GoodPopup(props: GoodPopupProp) {
             <Image
               style={PopupStyle.picture}
               resizeMode="contain"
-              source={require("@/static/defaultAvator.jpeg")}
+              source={{uri: props.defaultThumbnail}}
             />
             <View style={{justifyContent: "space-between"}}>
-              <Text style={PopupStyle.price}>￥{defaultPrice}</Text>
+              <Text style={PopupStyle.price}>￥{price}</Text>
               <View style={PopupStyle.flexBox}>
                 <Pressable
                   disabled={num === 1}
@@ -234,9 +317,7 @@ export default function GoodPopup(props: GoodPopupProp) {
                   ]}>
                   <Text>{num}</Text>
                 </View>
-                <Pressable
-                  style={PopupStyle.numBtn}
-                  onPress={() => changeNum(num + 1)}>
+                <Pressable style={PopupStyle.numBtn} onPress={addNum}>
                   <Text>+</Text>
                 </Pressable>
                 <Text style={{paddingLeft: 10}}>有货</Text>
@@ -247,18 +328,18 @@ export default function GoodPopup(props: GoodPopupProp) {
             <>
               <Text style={PopupStyle.typeSizeTitle}>颜色分类（3）</Text>
               <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: "wrap"}]}>
-                {types.map((item, index) => (
+                {types.map(item => (
                   <Pressable
-                    key={index}
+                    key={item.id}
                     disabled={item.stockout}
                     style={[
                       PopupStyle.flexBox,
-                      selectTypeIdx === index
+                      selectTypeId === item.id
                         ? PopupStyle.typeWrapSelect
                         : PopupStyle.typeWrap,
                       item.stockout ? {opacity: 0.5} : {opacity: 1},
                     ]}
-                    onPress={() => changeTypeIdx(index)}>
+                    onPress={handlePressType(item.id)}>
                     <Image
                       style={{height: 30, width: 30}}
                       resizeMode="contain"
@@ -267,7 +348,7 @@ export default function GoodPopup(props: GoodPopupProp) {
                     <Text
                       style={[
                         {maxWidth: windowWidth - 60, paddingHorizontal: 10},
-                        selectTypeIdx === index
+                        selectTypeId === item.id
                           ? {color: "white"}
                           : {color: "black"},
                       ]}>
@@ -284,22 +365,22 @@ export default function GoodPopup(props: GoodPopupProp) {
             <>
               <Text style={PopupStyle.typeSizeTitle}>尺码</Text>
               <View style={[PopupStyle.flexBox, {gap: 10, flexWrap: "wrap"}]}>
-                {sizes.map((item, index) => (
+                {sizes.map(item => (
                   <Text
-                    key={index}
+                    key={item.id}
                     disabled={item.stockout}
                     style={[
                       PopupStyle.flexBox,
-                      selectSizeIdx === index
+                      selectSizeId === item.id
                         ? PopupStyle.typeWrapSelect
                         : PopupStyle.typeWrap,
-                      selectSizeIdx === index
+                      selectSizeId === item.id
                         ? {color: "white"}
                         : {color: "black"},
                       item.stockout ? {opacity: 0.5} : {opacity: 1},
                       {paddingHorizontal: 15, paddingVertical: 5},
                     ]}
-                    onPress={() => changeSizeIdx(index)}>
+                    onPress={handlePressSize(item.id)}>
                     {item.name}
                   </Text>
                 ))}
@@ -327,13 +408,6 @@ const PopupStyle = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "flex-end",
-  },
-  container: {
-    width: windowWidth,
-    height: 700,
-    backgroundColor: "#eeeeee",
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
   },
   modal: {
     width: windowWidth,
@@ -374,7 +448,6 @@ const PopupStyle = StyleSheet.create({
   selectDetailWrap: {
     backgroundColor: "white",
     padding: 15,
-    flex: 1,
     gap: 10,
   },
   pictureNumWrap: {
@@ -392,7 +465,7 @@ const PopupStyle = StyleSheet.create({
     color: "#ff6f43",
     fontSize: 25,
     fontWeight: "500",
-    lineHeight: 25,
+    lineHeight: 30,
   },
   numBtn: {
     height: 30,

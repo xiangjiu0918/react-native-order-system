@@ -7,16 +7,16 @@ import {
   LayoutChangeEvent,
   Alert,
   ToastAndroid,
-} from 'react-native';
-import React, {useState} from 'react';
-import {NavigationProp} from '@react-navigation/native';
-import Icons from 'react-native-vector-icons/AntDesign';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import {useAppSelector, useAppDispatch} from '@/store/hooks';
-import {exist, updateAvatar} from '@/store/slice/userSlice';
-import {showBottomBar, hideBottomBar} from '@/store/slice/bottomBarSlice';
-import axios from '@/utils/axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+} from "react-native";
+import React, {useState} from "react";
+import {NavigationProp} from "@react-navigation/native";
+import Icons from "react-native-vector-icons/AntDesign";
+import {launchCamera, launchImageLibrary} from "react-native-image-picker";
+import {useAppSelector, useAppDispatch} from "@/store/hooks";
+import {exist, updateAvatar} from "@/store/slice/userSlice";
+import {showBottomBar, hideBottomBar} from "@/store/slice/bottomBarSlice";
+import axios from "@/utils/axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Users({navigation}: {navigation: NavigationProp<any>}) {
   const {username, avatar} = useAppSelector(state => state.user);
@@ -24,10 +24,10 @@ export default function Users({navigation}: {navigation: NavigationProp<any>}) {
   const dispatch = useAppDispatch();
   const [width, handleWidth] = useState(0);
   React.useEffect(() => {
-    navigation.addListener('focus', () => {
+    navigation.addListener("focus", () => {
       dispatch(showBottomBar());
     });
-    navigation.addListener('blur', () => {
+    navigation.addListener("blur", () => {
       dispatch(hideBottomBar());
     });
   }, [navigation]);
@@ -37,64 +37,72 @@ export default function Users({navigation}: {navigation: NavigationProp<any>}) {
   }
   function handleLoad() {
     if (username === undefined) {
-      navigation.navigate('Load');
+      navigation.navigate("Load");
     }
   }
   function handleExist() {
-    Alert.alert('提示', '确认退出登录?', [
+    Alert.alert("提示", "确认退出登录?", [
       {
-        text: '确定',
+        text: "确定",
         onPress: () => {
           dispatch(exist());
           global.token = null;
-          AsyncStorage.removeItem('token');
+          AsyncStorage.removeItem("token");
         },
       },
       {
-        text: '取消',
-        style: 'cancel',
+        text: "取消",
+        style: "cancel",
       },
     ]);
   }
   function handleAddress() {
     if (username !== undefined) {
-      navigation.navigate('Address');
+      navigation.navigate("Address");
     } else {
-      navigation.navigate('Load');
+      navigation.navigate("Load");
     }
   }
   function handleOrder() {
     if (username !== undefined) {
-      navigation.navigate('Order');
+      navigation.navigate("Order");
     } else {
-      navigation.navigate('Load');
+      navigation.navigate("Load");
+    }
+  }
+  async function handleClearStorage() {
+    try {
+      await AsyncStorage.clear();
+      ToastAndroid.show("清除缓存成功", ToastAndroid.SHORT);
+    } catch (e) {
+      ToastAndroid.show(`清除缓存失败,${e}`, ToastAndroid.LONG);
     }
   }
   async function uploadAvatar() {
-    const result = await launchImageLibrary({mediaType: 'photo'});
+    const result = await launchImageLibrary({mediaType: "photo"});
     // const result = await launchCamera({mediaType: 'photo'});
     if (result.assets) {
       const formData = new FormData();
       // console.log('uri', result.assets[0].uri);
-      formData.append('avatar', {
+      formData.append("avatar", {
         uri: result.assets[0].uri,
-        type: 'image/jpeg',
-        name: 'avatar.jpg',
+        type: "image/jpeg",
+        name: "avatar.jpg",
       });
       axios
-        .post('/users/avatar', formData, {
+        .post("/users/avatar", formData, {
           headers: {
-            'content-type': 'multipart/form-data',
+            "content-type": "multipart/form-data",
           },
         })
         .then(
           res => {
-            ToastAndroid.show('上传成功', ToastAndroid.SHORT);
+            ToastAndroid.show("上传成功", ToastAndroid.SHORT);
             dispatch(updateAvatar(res.data?.data?.avatar));
             setAvatarState(res.data?.data?.avatar);
           },
           err => {
-            console.log('err', err);
+            console.log("err", err);
           },
         );
     }
@@ -114,18 +122,18 @@ export default function Users({navigation}: {navigation: NavigationProp<any>}) {
         ) : (
           <Image
             style={UserStyle.image}
-            source={require('@/static/defaultAvator.jpeg')}
+            source={require("@/static/defaultAvator.jpeg")}
           />
         )}
         <View style={[UserStyle.infoContainer, {width}]}>
           <Text style={UserStyle.load} onPress={handleLoad}>
-            {username ?? '点击登录'}
+            {username ?? "点击登录"}
           </Text>
           {username === undefined ? (
             <></>
           ) : (
             <Pressable style={UserStyle.exitBtn}>
-              <Text style={{color: '#2196F3'}} onPress={handleExist}>
+              <Text style={{color: "#2196F3"}} onPress={handleExist}>
                 退出登录
               </Text>
             </Pressable>
@@ -140,6 +148,9 @@ export default function Users({navigation}: {navigation: NavigationProp<any>}) {
         <Text>订单管理</Text>
         <Icons name="right" />
       </Pressable>
+      <Pressable style={UserStyle.item} onPress={handleClearStorage}>
+        <Text>清空缓存</Text>
+      </Pressable>
     </View>
   );
 }
@@ -151,15 +162,15 @@ const UserStyle = StyleSheet.create({
     gap: 10,
   },
   item: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
     borderRadius: 5,
     padding: 10,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   image: {
     height: 70,
@@ -167,23 +178,23 @@ const UserStyle = StyleSheet.create({
     borderRadius: 70,
   },
   flexBox: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
     paddingBottom: 10,
   },
   infoContainer: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 10,
   },
   load: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   exitBtn: {
-    borderColor: '#2196F3',
+    borderColor: "#2196F3",
     borderWidth: 1,
     borderRadius: 15,
     padding: 5,

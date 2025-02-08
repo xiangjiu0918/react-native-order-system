@@ -17,7 +17,7 @@ import alert from "@/utils/alert";
 interface DetailProp {
   route: {
     params: {
-      id: string;
+      id: number;
     };
   };
 }
@@ -40,7 +40,7 @@ export default function Index({
   const [onSale, changeOnSale] = useState(true);
   const typesRef = useRef([]);
   const sizesRef = useRef([]);
-  const categoriesRef = useRef([]);
+  const categoriesRef = useRef({});
   const handlePreSelectVisible = () => {
     changePreSelectVisible(!preSelectVisible);
   };
@@ -54,7 +54,8 @@ export default function Index({
     try {
       const res = await axios.get(`goods/${id}`);
       // console.log("res", res.data.data);
-      const {name, sale, district, postage, previewUrl, price} = res.data.data.good;
+      const {name, sale, district, postage, previewUrl, price} =
+        res.data.data.good;
       const {types, sizes, categories} = res.data.data;
       setName(name);
       setPrice(price);
@@ -107,7 +108,9 @@ export default function Index({
             <Text style={DetailStyle.title}>{name}</Text>
             <View style={DetailStyle.subBar}>
               <Icons name="enviromento" />
-              <Text>{district} 快递：{postage === 0 ? "免运费" : postage}</Text>
+              <Text>
+                {district} 快递：{postage === 0 ? "免运费" : postage}
+              </Text>
             </View>
             <View style={DetailStyle.subBar}>
               <Icons name="hearto" />
@@ -179,19 +182,23 @@ export default function Index({
       <GoodPopup
         visible={preSelectVisible}
         handleVisible={handlePreSelectVisible}
+        id={id}
         types={typesRef.current}
         sizes={sizesRef.current}
         categories={categoriesRef.current}
         defaultPrice={price}
+        defaultThumbnail={previewUrl[0]}
         mode="preSelect"
       />
       <GoodPopup
         visible={purchaseVisible}
         handleVisible={handlePurchaseVisible}
+        id={id}
         types={typesRef.current}
         sizes={sizesRef.current}
         categories={categoriesRef.current}
         defaultPrice={price}
+        defaultThumbnail={previewUrl[0]}
         mode="purchase"
       />
     </>

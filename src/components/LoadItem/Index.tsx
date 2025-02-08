@@ -5,15 +5,15 @@ import {
   StyleSheet,
   Pressable,
   ToastAndroid,
-} from 'react-native';
-import React, {useState} from 'react';
-import {useNavigation} from '@react-navigation/native';
-import {type NativeStackNavigationProp} from '@react-navigation/native-stack';
-import qs from 'qs';
-import axios from '@/utils/axios';
-import {useAppDispatch} from '@/store/hooks';
-import {load} from '@/store/slice/userSlice';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+} from "react-native";
+import React, {useState} from "react";
+import {useNavigation} from "@react-navigation/native";
+import {type NativeStackNavigationProp} from "@react-navigation/native-stack";
+import qs from "qs";
+import axios from "@/utils/axios";
+import {useAppDispatch} from "@/store/hooks";
+import {load} from "@/store/slice/userSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 interface LoadProp {
   handleLoad?: () => void;
   handleSignUp?: () => void;
@@ -21,10 +21,10 @@ interface LoadProp {
 
 export default function Load({handleLoad, handleSignUp}: LoadProp) {
   // const {username, password} = useAppSelector(state => state.user);
-  const [login, onChangeLogin] = useState('');
-  const [pwd, onChangePwd] = useState('');
-  const [loginWarn, setLoginWarn] = useState('');
-  const [pwdWarn, setPwdWarn] = useState('');
+  const [login, onChangeLogin] = useState("");
+  const [pwd, onChangePwd] = useState("");
+  const [loginWarn, setLoginWarn] = useState("");
+  const [pwdWarn, setPwdWarn] = useState("");
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   function pressLoad() {
@@ -33,25 +33,30 @@ export default function Load({handleLoad, handleSignUp}: LoadProp) {
       password: pwd,
     });
     axios
-      .post('/users/sign_in', params, {
+      .post("/users/sign_in", params, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       })
       .then(
         res => {
           // console.log('res', res);
           global.token = res.data?.data?.token;
-          const {name: username, email, avatar} = res.data?.data?.user;
-          dispatch(load({username, email, avatar}));
-          AsyncStorage.setItem('token', res.data?.data?.token);
-          ToastAndroid.show('登陆成功', ToastAndroid.SHORT);
+          const {
+            id: userId,
+            name: username,
+            email,
+            avatar,
+          } = res.data?.data?.user;
+          dispatch(load({userId, username, email, avatar}));
+          AsyncStorage.setItem("token", res.data?.data?.token);
+          ToastAndroid.show("登陆成功", ToastAndroid.SHORT);
           if (handleLoad) {
             handleLoad();
           }
         },
         err => {
-          console.log('err', err);
+          console.log("err", err);
           err.response.data.errors.forEach((e: string) => {
             if (e.match(/用户/) || e.match(/邮箱/)) {
               setLoginWarn(e);
@@ -74,14 +79,14 @@ export default function Load({handleLoad, handleSignUp}: LoadProp) {
           <TextInput
             style={[
               LoadStyle.input,
-              loginWarn !== '' ? {borderColor: 'red'} : {},
+              loginWarn !== "" ? {borderColor: "red"} : {},
             ]}
             value={login}
             onChangeText={onChangeLogin}
             placeholder="请输入用户名或邮箱"
-            onFocus={() => setLoginWarn('')}
+            onFocus={() => setLoginWarn("")}
           />
-          {loginWarn !== '' ? (
+          {loginWarn !== "" ? (
             <Text style={LoadStyle.highlight}>{loginWarn}</Text>
           ) : (
             <></>
@@ -94,14 +99,14 @@ export default function Load({handleLoad, handleSignUp}: LoadProp) {
           <TextInput
             style={[
               LoadStyle.input,
-              pwdWarn !== '' ? {borderColor: 'red'} : {},
+              pwdWarn !== "" ? {borderColor: "red"} : {},
             ]}
             value={pwd}
             onChangeText={onChangePwd}
             placeholder="请输入密码"
-            onFocus={() => setPwdWarn('')}
+            onFocus={() => setPwdWarn("")}
           />
-          {pwdWarn !== '' ? (
+          {pwdWarn !== "" ? (
             <Text style={LoadStyle.highlight}>{pwdWarn}</Text>
           ) : (
             <></>
@@ -123,19 +128,19 @@ export default function Load({handleLoad, handleSignUp}: LoadProp) {
 
 const LoadStyle = StyleSheet.create({
   container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     flex: 1,
   },
   flexBoxC: {
     width: 320,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   input: {
     width: 200,
@@ -145,30 +150,30 @@ const LoadStyle = StyleSheet.create({
     padding: 10,
   },
   highlight: {
-    color: 'red',
+    color: "red",
   },
   loadBtn: {
     paddingHorizontal: 40,
     paddingVertical: 10,
     borderRadius: 5,
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   loadText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
   label: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 18,
     lineHeight: 40,
     height: 40,
   },
   remark: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   signUp: {
-    color: '#2196F3',
-    textDecorationLine: 'underline',
+    color: "#2196F3",
+    textDecorationLine: "underline",
   },
 });
