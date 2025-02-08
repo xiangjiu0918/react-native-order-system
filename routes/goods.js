@@ -147,7 +147,7 @@ router.get("/:id", async function (req, res, next) {
         let price = Infinity; // 商品默认展示最低价格
         if (types.length > 0) {
           await Promise.all(
-            types.map(async (t) => {
+            types.map(async (t, index) => {
               const r = await Category.findOne({
                 attributes: [
                   [
@@ -167,29 +167,42 @@ router.get("/:id", async function (req, res, next) {
               if (sizes.length > 0) {
                 await Promise.all(
                   sizes.map(async (s) => {
-                    const [r, c] = await Promise.all([
-                      Category.findOne({
-                        attributes: [
-                          [
-                            Sequelize.fn("SUM", Sequelize.col("inventory")),
-                            "inventory",
+                    let c;
+                    if (index === 0) {
+                      const arr = await Promise.all([
+                        Category.findOne({
+                          attributes: [
+                            [
+                              Sequelize.fn("SUM", Sequelize.col("inventory")),
+                              "inventory",
+                            ],
                           ],
-                        ],
-                        group: ["sizeId"],
-                        where: { sizeId: s.dataValues.id },
-                      }),
-                      Category.findOne({
+                          group: ["sizeId"],
+                          where: { sizeId: s.dataValues.id },
+                        }),
+                        Category.findOne({
+                          attributes: ["inventory", "price"],
+                          where: {
+                            typeId: t.dataValues.id,
+                            sizeId: s.dataValues.id,
+                          },
+                        }),
+                      ]);
+                      c = arr[1];
+                      transSizes.push({
+                        ...s.dataValues,
+                        stockout:
+                          arr[0]?.dataValues.inventory <= 0 ? true : false,
+                      });
+                    } else {
+                      c = await Category.findOne({
                         attributes: ["inventory", "price"],
                         where: {
                           typeId: t.dataValues.id,
                           sizeId: s.dataValues.id,
                         },
-                      }),
-                    ]);
-                    transSizes.push({
-                      ...s.dataValues,
-                      stockout: r?.dataValues.inventory <= 0 ? true : false,
-                    });
+                      });
+                    }
                     categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
                       inventory: c.dataValues.inventory,
                       price: Number(c.dataValues.price),
