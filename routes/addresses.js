@@ -39,7 +39,7 @@ async function clearCache(userId, id = null) {
   if (id) {
     // 如果是数组，则遍历
     const keys = Array.isArray(id)
-      ? id.map((item) => `address:${item}`)
+      ? id.map((item) => `address:${userId}:${item}`)
       : `address:${userId}:${id}`;
     await delKey(keys);
   }
@@ -119,8 +119,9 @@ router.post("/", userAuth, async function (req, res) {
  */
 router.delete("/:id", userAuth, async function (req, res) {
   try {
-    const address = findAddress(req.params.id);
-    if (address.dataValues.default === true) delKey("address:default");
+    const address = await findAddress(req.params.id);
+    if (address.dataValues.default === true)
+      delKey(`address:${req.userId}:default`);
     await Address.destroy({ where: { id: req.params.id } });
     await clearCache(req.userId, req.params.id);
     success(res, "删除收货地址成功。");
