@@ -9,6 +9,8 @@ const captchaRouter = require("./routes/captcha");
 const usersRouter = require("./routes/users");
 const addressesRouter = require("./routes/addresses");
 const goodsRouter = require("./routes/goods");
+const preselectRouter = require("./routes/preselect");
+const userAuth = require("./middlewares/user-auth");
 
 const app = express();
 
@@ -23,5 +25,6 @@ app.use("/captcha", captchaRouter);
 app.use("/users", usersRouter);
 app.use("/addresses", addressesRouter);
 app.use("/goods", goodsRouter);
+app.use("/preselects", userAuth, preselectRouter);
 
 module.exports = app;

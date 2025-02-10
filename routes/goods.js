@@ -10,21 +10,6 @@ const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
 const { Op } = require("sequelize");
 
 /**
- * 过滤输入
- * @returns {Object}
- */
-function filterBody(req) {
-  return {
-    userId: req.userId,
-    name: req.body.name,
-    tel: req.body.tel,
-    district: JSON.stringify(req.body.district),
-    detail: req.body.detail,
-    default: Boolean(req.body.default),
-  };
-}
-
-/**
  * 清除缓存
  * @returns {Promise<void>}
  */
@@ -118,8 +103,8 @@ router.get("/", async function (req, res, next) {
 router.get("/:id", async function (req, res, next) {
   try {
     const { id } = req.params;
-
-    let goodWithCatgory = await getKey(`good:${id}`);
+    const cacheKey = `good:${id}`;
+    let goodWithCatgory = await getKey(cacheKey);
     if (!goodWithCatgory) {
       const [good, types, sizes] = await Promise.all([
         Good.findByPk(id, {
@@ -140,7 +125,6 @@ router.get("/:id", async function (req, res, next) {
         const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
           return `http://${process.env.CDN_DOMAIN}/${i}`;
         });
-        console.log("types", types, "sizes", sizes);
         let categories = {};
         let transTypes = [];
         let transSizes = [];
@@ -180,7 +164,7 @@ router.get("/:id", async function (req, res, next) {
                           where: { sizeId: s.dataValues.id },
                         }),
                         Category.findOne({
-                          attributes: ["inventory", "price"],
+                          attributes: ["id", "inventory", "price"],
                           where: {
                             typeId: t.dataValues.id,
                             sizeId: s.dataValues.id,
@@ -195,15 +179,16 @@ router.get("/:id", async function (req, res, next) {
                       });
                     } else {
                       c = await Category.findOne({
-                        attributes: ["inventory", "price"],
+                        attributes: ["id", "inventory", "price"],
                         where: {
                           typeId: t.dataValues.id,
                           sizeId: s.dataValues.id,
                         },
                       });
                     }
+                    console.log("c", c);
                     categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
-                      inventory: c.dataValues.inventory,
+                      ...c.dataValues,
                       price: Number(c.dataValues.price),
                     };
                     price = Math.min(Number(c.dataValues.price), price);
@@ -212,14 +197,14 @@ router.get("/:id", async function (req, res, next) {
                 );
               } else {
                 const c = await Category.findOne({
-                  attributes: ["inventory", "price"],
+                  attributes: ["id", "inventory", "price"],
                   where: {
                     typeId: t.dataValues.id,
                     sizeId: null,
                   },
                 });
                 categories[`${t.dataValues.id}:-1`] = {
-                  inventory: c.dataValues.inventory,
+                  ...c.dataValues,
                   price: Number(c.dataValues.price),
                 };
                 price = Math.min(Number(c.dataValues.price), price);
@@ -244,9 +229,9 @@ router.get("/:id", async function (req, res, next) {
                     where: { sizeId: s.dataValues.id },
                   }),
                   Category.findOne({
-                    attributes: ["inventory", "price"],
+                    attributes: ["id", "inventory", "price"],
                     where: {
-                      typeId: t.dataValues.id,
+                      typeId: null,
                       sizeId: s.dataValues.id,
                     },
                   }),
@@ -257,7 +242,7 @@ router.get("/:id", async function (req, res, next) {
                   stockout: arr[0]?.dataValues.inventory <= 0 ? true : false,
                 });
                 categories[`-1:${s.dataValues.id}`] = {
-                  inventory: c.dataValues.inventory,
+                  ...c.dataValues,
                   price: Number(c.dataValues.price),
                 };
                 price = Math.min(Number(c.dataValues.price), price);
@@ -265,13 +250,13 @@ router.get("/:id", async function (req, res, next) {
             );
           } else {
             const c = await Category.findOne({
-              attributes: ["inventory", "price"],
+              attributes: ["id", "inventory", "price"],
               where: {
                 goodId: id,
               },
             });
             categories["-1:-1"] = {
-              inventory: c.dataValues.inventory,
+              ...c.dataValues,
               price: Number(c.dataValues.price),
             };
             price = Math.min(Number(c.dataValues.price), price);
@@ -287,7 +272,7 @@ router.get("/:id", async function (req, res, next) {
           sizes: transSizes.sort((a, b) => a.id - b.id),
           categories,
         };
-        await setKey(`good:${id}`, goodWithCatgory);
+        await setKey(cacheKey, goodWithCatgory);
       }
     }
     success(res, "查询商品成功", {

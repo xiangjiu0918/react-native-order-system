@@ -24,9 +24,6 @@ module.exports = {
       num: {
         type: Sequelize.INTEGER,
       },
-      size: {
-        type: Sequelize.STRING,
-      },
       orderTime: {
         type: Sequelize.DATE,
       },

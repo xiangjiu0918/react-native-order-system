@@ -243,8 +243,8 @@ router.get("/default", userAuth, async function (req, res, next) {
 router.get("/:id", userAuth, async function (req, res, next) {
   try {
     const { id } = req.params;
-
-    let address = await getKey(`address:${req.userId}:${id}`);
+    const cacheKey = `address:${req.userId}:${id}`;
+    let address = await getKey(cacheKey);
     if (!address) {
       address = await Address.findByPk(id);
       if (address) {
@@ -252,7 +252,7 @@ router.get("/:id", userAuth, async function (req, res, next) {
       } else {
         throw new NotFound(`ID: ${id}的收货地址未找到。`);
       }
-      await setKey(`address:${id}`, address);
+      await setKey(cacheKey, address);
     }
     success(res, "查询收货地址成功", { address });
   } catch (e) {

@@ -21,7 +21,6 @@ module.exports = (sequelize, DataTypes) => {
       categoryId: DataTypes.INTEGER,
       addressId: DataTypes.INTEGER,
       num: DataTypes.INTEGER,
-      size: DataTypes.STRING,
       orderTime: DataTypes.DATE,
       paymentTime: DataTypes.DATE,
       status: DataTypes.BOOLEAN,
