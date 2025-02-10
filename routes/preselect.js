@@ -22,37 +22,10 @@ function filterBody(req) {
 }
 
 /**
- * 新增预选
+ * 新增/修改预选
  * POST /preselects
  */
 router.post("/", async function (req, res, next) {
-  try {
-    const body = filterBody(req);
-    // 需要保证地址id和用户id匹配
-    const address = await Address.findByPk(body.addressId);
-    if (!address) throw new NotFound("地址不存在！");
-    else if (address.dataValues.userId === body.userId) {
-      const category = await Category.findByPk(body.categoryId);
-      if (!category) throw new NotFound("分类不存在！");
-      else if (category.dataValues.goodId !== Number(body.goodId))
-        throw new BadRequest("分类id与商品id不匹配！");
-      const preselect = await Preselect.create(body);
-      success(res, "添加预选成功", {
-        preselect,
-      });
-    } else {
-      throw new BadRequest("地址id与用户id不匹配！");
-    }
-  } catch (e) {
-    failure(res, e, "添加预选失败");
-  }
-});
-
-/**
- * 修改预选
- * PUT /preselects
- */
-router.put("/", async function (req, res, next) {
   try {
     const body = filterBody(req);
     // 需要保证地址id和用户id匹配
