@@ -71,6 +71,13 @@ router.get("/:goodId", async function (req, res, next) {
           userId: req.userId,
           goodId,
         },
+        include: [
+          {
+            model: Category,
+            as: "category",
+            attributes: ["typeId", "sizeId"],
+          },
+        ],
       });
       if (!preselect) {
         throw new NotFound(`goodId: ${goodId}的预选单未找到。`);
