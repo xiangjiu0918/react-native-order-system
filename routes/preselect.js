@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Sequelize = require("sequelize");
-const { Preselect, Address } = require("../models");
+const { Preselect, Address, Category } = require("../models");
 const { success, failure } = require("../utils/responses");
 const { NotFound, BadRequest } = require("http-errors");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
@@ -14,6 +14,7 @@ const { Op } = require("sequelize");
 function filterBody(req) {
   return {
     userId: req.userId,
+    goodId: req.body.goodId,
     categoryId: req.body.categoryId,
     addressId: req.body.addressId,
     num: req.body.num,
@@ -29,7 +30,12 @@ router.post("/", async function (req, res, next) {
     const body = filterBody(req);
     // 需要保证地址id和用户id匹配
     const address = await Address.findByPk(body.addressId);
-    if (address?.dataValues?.userId === body.userId) {
+    if (!address) throw new NotFound("地址不存在！");
+    else if (address.dataValues.userId === body.userId) {
+      const category = await Category.findByPk(body.categoryId);
+      if (!category) throw new NotFound("分类不存在！");
+      else if (category.dataValues.goodId !== Number(body.goodId))
+        throw new BadRequest("分类id与商品id不匹配！");
       const preselect = await Preselect.create(body);
       success(res, "添加预选成功", {
         preselect,
@@ -44,19 +50,28 @@ router.post("/", async function (req, res, next) {
 
 /**
  * 修改预选
- * PUT /preselects/:id
+ * PUT /preselects
  */
-router.put("/:id", async function (req, res, next) {
+router.put("/", async function (req, res, next) {
   try {
     const body = filterBody(req);
-    const { id } = req.params;
     // 需要保证地址id和用户id匹配
     const address = await Address.findByPk(body.addressId);
-    if (address?.dataValues?.userId === body.userId) {
-      let preselect = await Preselect.findByPk(id);
+    if (!address) throw new NotFound("地址不存在！");
+    else if (address.dataValues.userId === body.userId) {
+      const category = await Category.findByPk(body.categoryId);
+      if (!category) throw new NotFound("分类不存在！");
+      else if (category.dataValues.goodId !== Number(body.goodId))
+        throw new BadRequest("分类id与商品id不匹配！");
+      let preselect = await Preselect.findOne({
+        where: {
+          userId: body.userId,
+          goodId: body.goodId,
+        },
+      });
       if (!preselect) preselect = await Preselect.create(body);
       else preselect = await preselect.update(body);
-      delKey(`preselect:${req.userId}:${id}`);
+      delKey(`preselect:${body.userId}:${body.goodId}`);
       success(res, "修改预选成功", {
         preselect,
       });
@@ -70,17 +85,22 @@ router.put("/:id", async function (req, res, next) {
 
 /**
  * 获取预选
- * GET /preselects/:id
+ * GET /preselects/:goodId
  */
-router.get("/:id", async function (req, res, next) {
+router.get("/:goodId", async function (req, res, next) {
   try {
-    const { id } = req.params;
-    const cacheKey = `preselect:${req.userId}:${id}`;
+    const { goodId } = req.params;
+    const cacheKey = `preselect:${req.userId}:${goodId}`;
     let preselect = await getKey(cacheKey);
     if (!preselect) {
-      preselect = await Preselect.findByPk(id);
+      preselect = await Preselect.findOne({
+        where: {
+          userId: req.userId,
+          goodId,
+        },
+      });
       if (!preselect) {
-        throw new NotFound(`ID: ${id}的预选单未找到。`);
+        throw new NotFound(`goodId: ${goodId}的预选单未找到。`);
       }
       if (preselect.userId !== req.userId) {
         throw new BadRequest("用户id和预选单id不匹配！");

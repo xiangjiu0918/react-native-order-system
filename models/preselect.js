@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
   Preselect.init(
     {
       userId: DataTypes.INTEGER,
+      goodId: DataTypes.INTEGER,
       categoryId: DataTypes.INTEGER,
       addressId: DataTypes.INTEGER,
       num: DataTypes.INTEGER,

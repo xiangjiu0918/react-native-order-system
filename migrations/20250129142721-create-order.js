@@ -15,6 +15,10 @@ module.exports = {
       userId: {
         type: Sequelize.INTEGER,
       },
+      goodId: {
+        allowNull: false,
+        type: Sequelize.INTEGER,
+      },
       categoryId: {
         type: Sequelize.INTEGER,
       },
