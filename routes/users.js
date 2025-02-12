@@ -68,6 +68,26 @@ router.post("/sign_up", validateCaptcha, async function (req, res) {
 });
 
 /**
+ * 测试用户注册
+ * POST /users/sign_up
+ */
+router.post("/test_sign_up", async function (req, res) {
+  try {
+    const body = {
+      email: req.body.email,
+      name: req.body.name,
+      password: req.body.password,
+      avatar: "uploads/defaultAvator.jpeg",
+    };
+    const user = await User.create(body);
+    delete user.dataValues.password; // 删除密码
+    success(res, "创建用户成功。", { user }, 201);
+  } catch (error) {
+    failure(res, error);
+  }
+});
+
+/**
  * 用户登录
  * POST /users/sign_in
  */

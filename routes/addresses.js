@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require("axios");
 const { Address } = require("../models");
 const { success, failure } = require("../utils/responses");
-const { NotFound } = require("http-errors");
+const { NotFound, BadRequest } = require("http-errors");
 const userAuth = require("../middlewares/user-auth");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
 const { Op } = require("sequelize");
@@ -39,8 +39,8 @@ async function clearCache(userId, id = null) {
   if (id) {
     // 如果是数组，则遍历
     const keys = Array.isArray(id)
-      ? id.map((item) => `address:${userId}:${item}`)
-      : `address:${userId}:${id}`;
+      ? id.map((item) => `address:${item}`)
+      : `address:${id}`;
     await delKey(keys);
   }
 }
@@ -243,18 +243,22 @@ router.get("/default", userAuth, async function (req, res, next) {
 router.get("/:id", userAuth, async function (req, res, next) {
   try {
     const { id } = req.params;
-    const cacheKey = `address:${req.userId}:${id}`;
+    // 缓存中不要标明用户id，否则当用户id和地址id不匹配时，会导致缓存命中率下降
+    const cacheKey = `address:${id}`;
     let address = await getKey(cacheKey);
     if (!address) {
       address = await Address.findByPk(id);
-      if (address) {
+      if (!address) throw new NotFound(`ID: ${id}的收货地址未找到。`);
+      else if (address.dataValues.userId !== req.userId)
+        throw new BadRequest("地址id与用户id不匹配！");
+      else {
         address.dataValues.district = JSON.parse(address.dataValues.district);
-      } else {
-        throw new NotFound(`ID: ${id}的收货地址未找到。`);
+        await setKey(cacheKey, address);
+        success(res, "查询收货地址成功", { address });
       }
-      await setKey(cacheKey, address);
-    }
-    success(res, "查询收货地址成功", { address });
+    } else if (address.userId !== req.userId)
+      throw new BadRequest("地址id与用户id不匹配！");
+    else success(res, "查询收货地址成功", { address });
   } catch (e) {
     failure(res, e, "查询收货地址失败");
   }

@@ -1,5 +1,6 @@
 "use strict";
 const { Model } = require("sequelize");
+const { NotFound } = require("http-errors");
 module.exports = (sequelize, DataTypes) => {
   class Category extends Model {
     /**
@@ -19,7 +20,16 @@ module.exports = (sequelize, DataTypes) => {
       typeId: DataTypes.INTEGER,
       sizeId: DataTypes.INTEGER,
       goodId: DataTypes.INTEGER,
-      inventory: DataTypes.INTEGER,
+      inventory: {
+        type: DataTypes.INTEGER,
+        set(value) {
+          if (value < 0) {
+            throw new NotFound("库存不足！");
+          } else {
+            this.setDataValue("inventory", value);
+          }
+        },
+      },
       price: DataTypes.INTEGER,
     },
     {

@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
   }
   Order.init(
     {
-      orderId: DataTypes.STRING,
+      orderid: DataTypes.STRING,
       userId: DataTypes.INTEGER,
       goodId: DataTypes.INTEGER,
       categoryId: DataTypes.INTEGER,
@@ -24,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
       num: DataTypes.INTEGER,
       orderTime: DataTypes.DATE,
       paymentTime: DataTypes.DATE,
-      status: DataTypes.BOOLEAN,
+      status: DataTypes.INTEGER,
     },
     {
       sequelize,

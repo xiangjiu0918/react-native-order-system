@@ -9,7 +9,7 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      orderId: {
+      orderid: {
         type: Sequelize.STRING,
       },
       userId: {
@@ -35,7 +35,7 @@ module.exports = {
         type: Sequelize.DATE,
       },
       status: {
-        type: Sequelize.BOOLEAN,
+        type: Sequelize.INTEGER,
       },
       createdAt: {
         allowNull: false,

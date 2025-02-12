@@ -4,12 +4,17 @@ const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 require("dotenv").config();
 
+// 启动定时任务
+const initScheduleTasks = require("./tasks");
+initScheduleTasks();
+
 const indexRouter = require("./routes/index");
 const captchaRouter = require("./routes/captcha");
 const usersRouter = require("./routes/users");
 const addressesRouter = require("./routes/addresses");
 const goodsRouter = require("./routes/goods");
-const preselectRouter = require("./routes/preselect");
+const preselectRouter = require("./routes/preselects");
+const orderRouter = require("./routes/orders");
 const userAuth = require("./middlewares/user-auth");
 
 const app = express();
@@ -26,5 +31,6 @@ app.use("/users", usersRouter);
 app.use("/addresses", addressesRouter);
 app.use("/goods", goodsRouter);
 app.use("/preselects", userAuth, preselectRouter);
+app.use("/orders", userAuth, orderRouter);
 
 module.exports = app;

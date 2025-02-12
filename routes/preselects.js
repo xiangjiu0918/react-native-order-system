@@ -81,7 +81,7 @@ router.get("/:goodId", async function (req, res, next) {
       });
       if (!preselect) {
         throw new NotFound(`goodId: ${goodId}的预选单未找到。`);
-      } else if (preselect.userId !== req.userId) {
+      } else if (preselect.dataValues.userId !== req.userId) {
         throw new BadRequest("用户id和预选单id不匹配！");
       }
       await setKey(cacheKey, preselect);
