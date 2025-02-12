@@ -34,7 +34,6 @@ router.post("/", async function (req, res, next) {
     const addressKey = `address:${body.addressId}`;
     const categoryKey = `category:${body.categoryId}`;
     let address = await getKey(addressKey);
-    console.log(address, body.userId);
     if (!address) {
       // 未命中缓存
       address = await Address.findByPk(body.addressId);
@@ -72,7 +71,6 @@ router.post("/", async function (req, res, next) {
     // 因为能竞争到锁的是少数，所以数据库读取量不会很大
     category = await Category.findByPk(body.categoryId, {
       transaction: t,
-      lock: true,
     });
     category = await category.update(
       {
@@ -84,7 +82,6 @@ router.post("/", async function (req, res, next) {
         },
         transaction: t,
         // 使用排他锁
-        lock: true,
       }
     );
     body = {
@@ -95,7 +92,6 @@ router.post("/", async function (req, res, next) {
     };
     order = await Order.create(body, {
       transaction: t,
-      lock: true,
     });
     await setKey(`order:${order.orderid}`, order);
     delete order.dataValues.id;
@@ -151,7 +147,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
         );
         // 回加库存
         const category = await Category.findByPk(order.dataValues.categoryId, {
-          lock: true,
           transaction: t,
         });
         await category.update(
@@ -160,7 +155,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
           },
           {
             transaction: t,
-            lock: true,
           }
         );
         setKey(`category:${order.dataValues.categoryId}`, category);
@@ -191,7 +185,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
       );
       // 回加库存
       const category = await Category.findByPk(order.categoryId, {
-        lock: true,
         transaction: t,
       });
       await category.update(
@@ -200,7 +193,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
         },
         {
           transaction: t,
-          lock: true,
         }
       );
       setKey(`category:${order.categoryId}`, category);
@@ -211,7 +203,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
     order = await Order.findOne({
       where: { orderid },
       transaction: t,
-      lock: true,
     });
     order = await order.update(
       {
@@ -220,7 +211,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
       },
       {
         transaction: t,
-        lock: true,
       }
     );
     delete order.dataValues.id;

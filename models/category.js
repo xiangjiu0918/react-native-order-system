@@ -31,10 +31,16 @@ module.exports = (sequelize, DataTypes) => {
         },
       },
       price: DataTypes.INTEGER,
+      version: {
+        allowNull: false,
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
     },
     {
       sequelize,
       modelName: "Category",
+      version: true, // 乐观锁
     }
   );
   return Category;

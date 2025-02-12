@@ -24,7 +24,6 @@ function scheduleOrderCheck() {
           },
         },
         transaction: t,
-        lock: true, // 使用排它锁，防止并发更新
       });
 
       // 已超时订单的 ID 列表
@@ -56,13 +55,12 @@ function scheduleOrderCheck() {
           Object.keys(categories).map(async (categoryId) => {
             let category = await Category.findByPk(categoryId, {
               transaction: t,
-              lock: true,
             });
             category = await category.update(
               {
                 inventory: category.inventory + categories[categoryId],
               },
-              { transaction: t, lock: true }
+              { transaction: t }
             );
             // 更新缓存
             setKey(`category:${categoryId}`, category);
