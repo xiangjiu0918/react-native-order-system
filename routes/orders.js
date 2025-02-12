@@ -37,10 +37,19 @@ router.post("/", async function (req, res, next) {
     if (!address) {
       // 未命中缓存
       address = await Address.findByPk(body.addressId);
-      if (!address) throw new NotFound("地址不存在！");
-      else if (address.dataValues.userId !== body.userId)
+      if (!address) {
+        setKey(addressKey, { msg: "not found" });
+        throw new NotFound("地址不存在！");
+      }
+      setKey(addressKey, address);
+      if (address.dataValues.userId !== Number(body.userId))
         throw new BadRequest("地址id与用户id不匹配！");
-    } else if (address.userId !== body.userId) throw new BadRequest("地址id与用户id不匹配！");
+    } else if (address.msg === "地址不存在") {
+      throw new NotFound("地址不存在！");
+    } else if (address.userId !== Number(body.userId)) {
+      console.log("address.userid", address.userId, body.userId);
+      throw new BadRequest("地址id与用户id不匹配！");
+    }
     // 分类相关
     let category = await getKey(categoryKey);
     if (!category) {
