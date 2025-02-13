@@ -5,8 +5,8 @@ const logger = require("morgan");
 require("dotenv").config();
 
 // 启动定时任务
-const initScheduleTasks = require("./tasks");
-initScheduleTasks();
+// const initScheduleTasks = require("./tasks");
+// initScheduleTasks();
 
 const indexRouter = require("./routes/index");
 const captchaRouter = require("./routes/captcha");

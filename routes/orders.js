@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const Sequelize = require("sequelize");
 const { sequelize, Order, Address, Category } = require("../models");
 const { success, failure } = require("../utils/responses");
 const { NotFound, BadRequest } = require("http-errors");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
 const { Op } = require("sequelize");
 const { v4: uuidv4 } = require("uuid");
+const { delayOrderProducer } = require("../utils/rabbit-mq");
 
 /**
  * 过滤输入
@@ -107,6 +107,8 @@ router.post("/", async function (req, res, next) {
     await setKey(`order:${order.orderid}`, order);
     delete order.dataValues.id;
     await setKey(categoryKey, category);
+    // 创建延迟队列，15分钟后自动取消订单
+    delayOrderProducer(order.orderid, 1 * 60 * 1000);
     await t.commit();
     success(res, "创建订单成功", {
       order,
@@ -144,76 +146,11 @@ router.put("/pay/:orderid", async function (req, res, next) {
         throw new BadRequest("订单已支付！");
       else if (order.dataValues.status === 2)
         throw new BadRequest("订单已超时取消！");
-      else if (
-        (Date.now() - order.dataValues.orderTime.getTime()) / (1000 * 60) >
-        15
-      ) {
-        order = await order.update(
-          {
-            status: 2,
-          },
-          {
-            transaction: t,
-          }
-        );
-        // 回加库存
-        const category = await Category.findByPk(order.dataValues.categoryId, {
-          transaction: t,
-          lock: true,
-        });
-        await category.update(
-          {
-            inventory: category.dataValues.inventory + 1,
-          },
-          {
-            transaction: t,
-          }
-        );
-        setKey(`category:${order.dataValues.categoryId}`, category);
-        setKey(orderKey, order);
-        t.commit();
-        throw new BadRequest("订单已超时取消！");
-      }
     } else if (order.msg === "not found") throw new NotFound("订单不存在！");
     else if (order.userId !== req.userId) {
       throw new BadRequest("订单id和用户id不匹配！");
     } else if (order.status === 1) throw new BadRequest("订单已支付！");
     else if (order.status === 2) throw new BadRequest("订单已超时取消！");
-    else if (
-      (Date.now() - new Date(order.orderTime).getTime()) / (1000 * 60) >
-      15
-    ) {
-      order = await Order.findOne({
-        where: { orderid },
-        transaction: t,
-      });
-      order = await order.update(
-        {
-          status: 2,
-        },
-        {
-          transaction: t,
-        }
-      );
-      // 回加库存
-      const category = await Category.findByPk(order.categoryId, {
-        transaction: t,
-        lock: true,
-      });
-      await category.update(
-        {
-          inventory: category.dataValues.inventory + 1,
-        },
-        {
-          transaction: t,
-          lock: true,
-        }
-      );
-      setKey(`category:${order.categoryId}`, category);
-      setKey(orderKey, order);
-      t.commit();
-      throw new BadRequest("订单已超时取消！");
-    }
     order = await Order.findOne({
       where: { orderid },
       transaction: t,
