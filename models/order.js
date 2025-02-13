@@ -25,16 +25,10 @@ module.exports = (sequelize, DataTypes) => {
       orderTime: DataTypes.DATE,
       paymentTime: DataTypes.DATE,
       status: DataTypes.INTEGER,
-      version: {
-        allowNull: false,
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-      },
     },
     {
       sequelize,
       modelName: "Order",
-      version: true, // 乐观锁
     }
   );
   return Order;

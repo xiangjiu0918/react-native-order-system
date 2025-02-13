@@ -49,18 +49,20 @@ function scheduleOrderCheck() {
                 id: orderIds,
               },
               transaction: t,
+              lock: true,
             }
           ),
         ].concat(
           Object.keys(categories).map(async (categoryId) => {
             let category = await Category.findByPk(categoryId, {
               transaction: t,
+              lock: true,
             });
             category = await category.update(
               {
                 inventory: category.inventory + categories[categoryId],
               },
-              { transaction: t }
+              { transaction: t, lcok: true }
             );
             // 更新缓存
             setKey(`category:${categoryId}`, category);

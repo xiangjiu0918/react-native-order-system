@@ -6,7 +6,7 @@ const { TooManyRequests } = require("http-errors");
 const rateLimiter = new RateLimiterMySQL({
   storeClient: sequelize,
   keyPrefix: "middleware",
-  points: 10, // 10 requests
+  points: 100, // 10 requests
   duration: 1, // per 1 second
 });
 
