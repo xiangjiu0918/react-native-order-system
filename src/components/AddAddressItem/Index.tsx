@@ -30,17 +30,16 @@ interface districtOption {
 
 export default function AddAddress(props: {
   navigation?: NavigationProp<any>;
-  route?: {params: AddressStore};
   showBtn: boolean;
   handleClose?: () => void;
 }) {
   const {navigation} = props;
-  const payload = props.route?.params;
-  const [isDefault, switchDefault] = useState(payload?.default || false);
-  const [name, changeName] = useState(payload?.name || "");
-  const [tel, changeTel] = useState(payload?.tel || "");
-  const [district, changeDistrict] = useState(payload?.district || []);
-  const [detail, changeDetail] = useState(payload?.detail || "");
+  let idRef = useRef(-1);
+  const [isDefault, switchDefault] = useState(false);
+  const [name, changeName] = useState("");
+  const [tel, changeTel] = useState("");
+  const [district, changeDistrict] = useState([]);
+  const [detail, changeDetail] = useState("");
   const [telWarn, setTelWarn] = useState<string[]>([]);
   const [telHighlight, setTelHighlight] = useState(false);
   const address = useAppSelector(state => state.address);
@@ -63,11 +62,11 @@ export default function AddAddress(props: {
     const payloadBase: Address = {
       name,
       tel,
-      district: district,
+      district,
       detail,
       default: isDefault,
     };
-    if (payload === undefined) {
+    if (idRef.current === -1) {
       axios.post("/addresses", payloadBase).then(
         res => {
           dispatch(addItem(payloadBase));
@@ -91,7 +90,7 @@ export default function AddAddress(props: {
       );
     } else {
       axios
-        .put(`/addresses/${payload.id}`, payloadBase, {
+        .put(`/addresses/${idRef.current}`, payloadBase, {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
           },
@@ -100,7 +99,7 @@ export default function AddAddress(props: {
           res => {
             const payloadWithId: AddressStore = {
               ...payloadBase,
-              id: payload.id,
+              id: idRef.current,
             };
             dispatch(changeItem(payloadWithId));
             ToastAndroid.show("修改成功", ToastAndroid.SHORT);
@@ -135,12 +134,20 @@ export default function AddAddress(props: {
     };
   }
   useEffect(() => {
-    let submitListener = EventRegister.addEventListener("submit", () =>
+    const submitListener = EventRegister.addEventListener("submit", () =>
       btnCallBack.current(),
     );
-    const sig = Md5.hashStr(
-      "/ws/district/v1/list?key=U3MBZ-EXWCT-2L2X2-VDRMF-WRVH2-QXF3M&struct_type=1nigx3vilUvqIpiA99xdSDpKyQurO8OEH",
-    ).toLowerCase();
+    const addressListener = EventRegister.addEventListener(
+      "addAddress",
+      address => {
+        idRef.current = address.id;
+        switchDefault(address.default);
+        changeName(address.name);
+        changeTel(address.tel);
+        changeDistrict(address.district);
+        changeDetail(address.detail);
+      },
+    );
     axios.get("/addresses/district/list").then(
       res => {
         setList(transDistrict(res.data?.data?.list));
@@ -149,6 +156,7 @@ export default function AddAddress(props: {
     );
     return () => {
       EventRegister.removeEventListener(submitListener as string);
+      EventRegister.removeEventListener(addressListener as string);
     };
   }, []);
   return (
@@ -192,7 +200,7 @@ export default function AddAddress(props: {
               ]}
               value={tel}
               onChangeText={changeTel}
-              placeholder="请输入密码"
+              placeholder="请输入手机号"
               onFocus={resetState("pwd")}
             />
             {telHighlight ? (

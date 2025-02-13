@@ -14,6 +14,7 @@ import axios from "@/utils/axios";
 import {useAppDispatch} from "@/store/hooks";
 import {load} from "@/store/slice/userSlice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {EventRegister} from "react-native-event-listeners";
 interface LoadProp {
   handleLoad?: () => void;
   handleSignUp?: () => void;
@@ -50,6 +51,7 @@ export default function Load({handleLoad, handleSignUp}: LoadProp) {
           } = res.data?.data?.user;
           dispatch(load({userId, username, email, avatar}));
           AsyncStorage.setItem("token", res.data?.data?.token);
+          EventRegister.emit("load");
           ToastAndroid.show("登陆成功", ToastAndroid.SHORT);
           if (handleLoad) {
             handleLoad();

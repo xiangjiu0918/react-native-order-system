@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import React, {useEffect, useState, useRef} from "react";
 import Icons from "react-native-vector-icons/AntDesign";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// import AsyncStorage from "@react-native-async-storage/async-storage";
+import Spinner from "react-native-loading-spinner-overlay";
 import Popup, {type BasePopupProp} from "@/components/Popup/Index";
 import AddressPopup from "@/components/AddressPopup/Index";
 import LoadPopup from "@/components/LoadPopup/Index";
@@ -19,6 +20,7 @@ import {useAppSelector, useAppDispatch} from "@/store/hooks";
 import {initList} from "@/store/slice/addressSlice";
 import {EventRegister} from "react-native-event-listeners";
 import axios from "@/utils/axios";
+import alert from "@/utils/alert";
 
 interface TypesItem {
   id: number;
@@ -35,6 +37,7 @@ interface SizesItem {
 
 interface Categories {
   [key: string]: {
+    id: number;
     inventory: number;
     price: number;
   };
@@ -47,16 +50,6 @@ interface GoodPopupProp extends BasePopupProp {
   categories: Categories;
   defaultPrice: number;
   defaultThumbnail: string;
-}
-
-interface GoodMap {
-  [key: string]: GoodItem;
-}
-
-interface GoodItem {
-  typeId: number;
-  sizeId: number;
-  num: number;
 }
 
 let {width: windowWidth, height: windowHeight} = Dimensions.get("window");
@@ -75,34 +68,20 @@ export default function GoodPopup(props: GoodPopupProp) {
   );
   const [selectTypeId, changeTypeId] = useState(-1);
   const [selectSizeId, changeSizeId] = useState(-1);
+  const selectAddressIdRef = useRef(-1);
+  const orderidRef = useRef("");
   const [num, changeNum] = useState(1);
   const [addressVisible, changeAddressVisible] = useState(false);
   const [loadVisible, changeLoadVisible] = useState(false);
   const [payVisible, changePayVisible] = useState(false);
-  const id = "1";
-  const prefill = useRef<GoodMap>({});
-  const {categories} = props;
+  const [spinnerVisible, changSipnnerVisible] = useState(false);
+  const hasInit = useRef(false); // 标识是否初始化；
+  const {id, categories} = props;
   useEffect(() => {
-    if (global.token) {
-      axios.get("/addresses/default").then(res => {
-        const {address} = res.data?.data;
-        if (address !== null) {
-          if (address?.default === true) {
-            changeSelectAddress(address);
-            dispatch(initList({list: [address], default: address.id}));
-          } else {
-            changeSelectAddress(address);
-            dispatch(initList({list: [address], default: null}));
-          }
-        }
-      });
-    }
-    getPreFilling();
-    let preFillListener = EventRegister.addEventListener("updatePreFill", () =>
-      getPreFilling(),
-    );
+    // 登陆后要重新获取预选信息
+    EventRegister.addEventListener("load", initData);
     return () => {
-      EventRegister.removeEventListener(preFillListener as string);
+      EventRegister.removeEventListener("load");
     };
   }, []);
   useEffect(() => {
@@ -111,7 +90,42 @@ export default function GoodPopup(props: GoodPopupProp) {
     changeTypes(props.types);
     changeSizes(props.sizes);
     changePrice(props.defaultPrice);
+    initData();
   }, [props]);
+  const initData = async () => {
+    if (global.token && !hasInit.current) {
+      hasInit.current = true;
+      await getPreFilling();
+      if (selectAddressIdRef.current !== -1) {
+        // 说明有预选地址，获取预选地址
+        axios.get(`/addresses/${selectAddressIdRef.current}`).then(res => {
+          const {address} = res.data?.data;
+          if (address !== null) {
+            if (address?.default === true) {
+              changeSelectAddress(address);
+              dispatch(initList({list: [address], default: address.id}));
+            } else {
+              changeSelectAddress(address);
+              dispatch(initList({list: [address], default: null}));
+            }
+          }
+        });
+      } else {
+        axios.get("/addresses/default").then(res => {
+          const {address} = res.data?.data;
+          if (address !== null) {
+            if (address?.default === true) {
+              changeSelectAddress(address);
+              dispatch(initList({list: [address], default: address.id}));
+            } else {
+              changeSelectAddress(address);
+              dispatch(initList({list: [address], default: null}));
+            }
+          }
+        });
+      }
+    }
+  };
   const handleAddressVisible = () => {
     changeAddressVisible(!addressVisible);
   };
@@ -122,31 +136,75 @@ export default function GoodPopup(props: GoodPopupProp) {
     changePayVisible(!payVisible);
   };
   const getPreFilling = async () => {
-    // 预选信息和用户id、商品id有关
-    const res = await AsyncStorage.getItem(`pre-filling:${userId}:${id}`);
-    if (res !== null) {
-      prefill.current = JSON.parse(res);
-      const {num, typeId, sizeId} = prefill.current[id];
-      changeNum(num);
-      changeTypeId(typeId);
-      changeSizeId(sizeId);
+    // 因为商品接口返回有延迟，所以第一次调用getPreFilling时id为空
+    if (id !== undefined) {
+      // 预选信息和用户id、商品id有关
+      // const res = await AsyncStorage.getItem(`pre-filling:${userId}:${id}`);
+      try {
+        const res = await axios.get(`/preselects/${id}`);
+        if (res !== null) {
+          const {
+            preselect: {
+              num,
+              category: {typeId, sizeId},
+              addressId,
+            },
+          } = res.data?.data;
+          changeNum(num);
+          changeTypeId(typeId ?? -1);
+          changeSizeId(sizeId ?? -1);
+          selectAddressIdRef.current = addressId;
+        }
+      } catch (e) {
+        // 没有预选信息，不做任何处理
+        console.log("e", e);
+      }
     }
   };
-  const handleBtnPress = () => {
-    if (username === undefined || selectAddress === undefined)
-      handleLoadVisible();
-    else {
-      prefill.current[id] = {
-        sizeId: selectSizeId,
-        typeId: selectTypeId,
-        num,
-      };
-      AsyncStorage.setItem(
-        `pre-filling:${userId}:${id}`,
-        JSON.stringify(prefill.current),
-      );
-      EventRegister.emitEvent("updatePreFill");
-      if (props.mode === "purchase") handlePayVisible();
+  const handleBtnPress = async () => {
+    if (username === undefined) handleLoadVisible();
+    else if (selectAddress === undefined) {
+      ToastAndroid.show("请添加收货地址", ToastAndroid.LONG);
+    } else {
+      try {
+        const res = await axios.post(
+          "/preselects",
+          {
+            goodId: id,
+            categoryId: categories[`${selectTypeId}:${selectSizeId}`].id,
+            addressId: selectAddress.id,
+            num,
+          },
+          {
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          },
+        );
+        if (props.mode === "purchase") {
+          changSipnnerVisible(true);
+          const res = await axios.post(
+            "/orders",
+            {
+              goodId: id,
+              categoryId: categories[`${selectTypeId}:${selectSizeId}`].id,
+              addressId: selectAddress.id,
+              num,
+            },
+            {
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+            },
+          );
+          orderidRef.current = res.data?.data?.order.orderid;
+          changSipnnerVisible(false);
+          handlePayVisible();
+        } else ToastAndroid.show("保存成功", ToastAndroid.SHORT);
+      } catch (e) {
+        changSipnnerVisible(false);
+        alert();
+      }
     }
   };
   const handlePressType = (typeId: number) => {
@@ -263,7 +321,7 @@ export default function GoodPopup(props: GoodPopupProp) {
         {...props}
         btnText={props.mode === "preSelect" ? "提交预选信息" : "立即下单"}
         btnCallBack={handleBtnPress}
-        preventDefault={username === undefined}>
+        preventDefault={username === undefined || selectAddress === undefined}>
         {username !== undefined ? (
           <Pressable
             style={PopupStyle.addressWrap}
@@ -398,7 +456,13 @@ export default function GoodPopup(props: GoodPopupProp) {
         changeSelectItem={changeSelectAddress}
       />
       <LoadPopup visible={loadVisible} handleVisible={handleLoadVisible} />
-      <PayPopup visible={payVisible} handleVisible={handlePayVisible} />
+      <PayPopup
+        price={price}
+        orderid={orderidRef.current}
+        visible={payVisible}
+        handleVisible={handlePayVisible}
+      />
+      <Spinner visible={spinnerVisible} textContent="下单中" />
     </>
   );
 }

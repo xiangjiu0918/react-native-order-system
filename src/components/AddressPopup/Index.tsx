@@ -1,11 +1,12 @@
-import {View, Text, Pressable, StyleSheet} from 'react-native';
-import React, {useState, useEffect} from 'react';
-import Icons from 'react-native-vector-icons/AntDesign';
-import {EventRegister} from 'react-native-event-listeners';
-import Popup, {type BasePopupProp} from '../Popup/Index';
-import AddressItem from '@/components/AddressItem/Index';
-import AddAddressPopup from '../AddAddressPopup/Index';
-import {AddressStore} from '@/store/slice/addressSlice';
+import {View, Text, Pressable, StyleSheet} from "react-native";
+import React, {useState, useEffect} from "react";
+import Icons from "react-native-vector-icons/AntDesign";
+import {EventRegister} from "react-native-event-listeners";
+import Popup, {type BasePopupProp} from "../Popup/Index";
+import AddressItem from "@/components/AddressItem/Index";
+import AddAddressPopup from "../AddAddressPopup/Index";
+import {AddressStore} from "@/store/slice/addressSlice";
+import {useAppSelector} from "@/store/hooks";
 
 interface AddressPopupProp extends BasePopupProp {
   selectItem: AddressStore | undefined;
@@ -13,16 +14,20 @@ interface AddressPopupProp extends BasePopupProp {
 }
 
 export default function AddressPopup(props: AddressPopupProp) {
+  const address = useAppSelector(state => state.address);
   const [manageMode, switchMode] = useState(false);
   const [addVisible, changeAddVisible] = useState(false);
   const [currentSelect, changeCurrentSelect] = useState(props.selectItem);
+  useEffect(() => {
+    changeCurrentSelect(props.selectItem);
+  }, [props.selectItem]);
   const handleManage = () => {
     if (manageMode === false) {
       switchMode(!manageMode);
-      EventRegister.emitEvent('manageAddress');
+      EventRegister.emitEvent("manageAddress");
     } else {
       switchMode(!manageMode);
-      EventRegister.emitEvent('existManage');
+      EventRegister.emitEvent("existManage");
     }
   };
   const handleAddVisible = () => {
@@ -30,7 +35,21 @@ export default function AddressPopup(props: AddressPopupProp) {
   };
   function handleClose() {
     switchMode(false);
-    changeCurrentSelect(props.selectItem);
+    if (
+      (props.selectItem === undefined && address.list.length > 0) ||
+      address.list.findIndex(item => item.id === props.selectItem?.id) === -1
+    ) {
+      // 如果原本收货地址为空，且新增地址后没有选择收货地址
+      // 或者原本选择的地址被删了
+      // 那么就默认选择第一条收货地址
+      props.changeSelectItem(address.list[0]);
+    } else if (address.list.length === 0) {
+      // 如果把地址删到一条不剩了，也需要切换默认地址为暂无收货地址
+      props.changeSelectItem(null);
+    } else {
+      // 没有点击确认按钮，不改变选择的地址
+      changeCurrentSelect(props.selectItem);
+    }
   }
   return (
     <>
@@ -41,12 +60,12 @@ export default function AddressPopup(props: AddressPopupProp) {
         closeCallback={handleClose}
         btnCallBack={() => props.changeSelectItem(currentSelect)}>
         <View style={[PopupStyle.flexBox, PopupStyle.container]}>
-          <Text style={{color: 'black', fontWeight: '500'}}>常用地址</Text>
+          <Text style={{color: "black", fontWeight: "500"}}>常用地址</Text>
           <View style={PopupStyle.flexBox}>
             <Pressable style={PopupStyle.button} onPress={handleManage}>
               <Icons name="edit" style={PopupStyle.text} />
               <Text style={PopupStyle.text}>
-                {manageMode === true ? '完成' : '管理'}
+                {manageMode === true ? "完成" : "管理"}
               </Text>
             </Pressable>
             <Pressable
@@ -60,6 +79,7 @@ export default function AddressPopup(props: AddressPopupProp) {
         <AddressItem
           selectItem={currentSelect}
           changeSelectItem={changeCurrentSelect}
+          showAddAddress={handleAddVisible}
         />
       </Popup>
       <AddAddressPopup visible={addVisible} handleVisible={handleAddVisible} />
@@ -69,22 +89,22 @@ export default function AddressPopup(props: AddressPopupProp) {
 
 const PopupStyle = StyleSheet.create({
   container: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   flexBox: {
-    display: 'flex',
-    flexDirection: 'row',
+    display: "flex",
+    flexDirection: "row",
   },
   button: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   text: {
-    color: '#ff6f43',
+    color: "#ff6f43",
   },
 });

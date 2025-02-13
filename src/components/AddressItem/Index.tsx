@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   StatusBar,
   Pressable,
+  ToastAndroid,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 import React, {useEffect, useState} from "react";
@@ -30,9 +31,11 @@ import alert from "@/utils/alert";
 export default function AddressItem({
   selectItem,
   changeSelectItem,
+  showAddAddress,
 }: {
   selectItem?: AddressStore | undefined;
   changeSelectItem?: any;
+  showAddAddress?: () => void;
 }) {
   const address = useAppSelector(state => state.address);
   const dispatch = useAppDispatch();
@@ -67,12 +70,53 @@ export default function AddressItem({
   }
   function handleEdit(address: AddressStore) {
     return () => {
-      navigation.navigate("AddAddress", address);
+      if (showAddAddress) {
+        showAddAddress();
+      } else {
+        navigation.navigate("AddAddress");
+      }
+      setTimeout(() => {
+        EventRegister.emitEvent("addAddress", address);
+      }, 500);
     };
   }
-  function handleDefault(id: number) {
+  function handleDefault(address: AddressStore) {
     return (isDefault: boolean) => {
-      dispatch(changeDefault({isDefault, id}));
+      axios
+        .put(
+          `/addresses/${address.id}`,
+          {
+            address,
+            default: isDefault,
+          },
+          {
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          },
+        )
+        .then(
+          res => {
+            dispatch(changeDefault({isDefault, id: address.id}));
+            ToastAndroid.show("修改成功", ToastAndroid.SHORT);
+          },
+          err => {
+            alert();
+          },
+        );
+    };
+  }
+  function handleDelete(id: number) {
+    return async () => {
+      try {
+        await axios.delete(`/addresses/${id}`);
+        // 删除了默认地址的话，slice里面会自动将default处理成Null
+        dispatch(deleteItem(id));
+        ToastAndroid.show("删除成功", ToastAndroid.SHORT);
+      } catch (e) {
+        console.log("err", e);
+        alert();
+      }
     };
   }
   function handleCopy(payload: AddressStore) {
@@ -146,14 +190,14 @@ export default function AddressItem({
               <View style={AddressStyle.line}>
                 <CheckBox
                   value={address.default === item.id}
-                  onValueChange={handleDefault(item.id)}
+                  onValueChange={handleDefault(item)}
                 />
                 <Text>默认</Text>
               </View>
               <View style={AddressStyle.line}>
                 <Pressable
                   style={AddressStyle.button}
-                  onPress={() => dispatch(deleteItem(item.id))}>
+                  onPress={handleDelete(item.id)}>
                   <Text style={AddressStyle.btnText}>删除</Text>
                 </Pressable>
                 <Pressable
