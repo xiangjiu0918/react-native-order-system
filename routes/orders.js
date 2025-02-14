@@ -1,6 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const { sequelize, Order, Address, Category } = require("../models");
+const {
+  sequelize,
+  Order,
+  Address,
+  Category,
+  Size,
+  Type,
+  Good,
+} = require("../models");
 const { success, failure } = require("../utils/responses");
 const { NotFound, BadRequest } = require("http-errors");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
@@ -43,6 +51,149 @@ async function clearCache(id = null) {
     await delKey(keys);
   }
 }
+
+function bindGoodInfoWithOrder(arr) {
+  return arr.map(async (o) => {
+    let categoryKey = `category:${o.categoryId}`;
+    let goodKey = `good:${o.goodId}`;
+    let [category, good] = await Promise.all([
+      getKey(categoryKey),
+      getKey(goodKey),
+    ]);
+    if (!category) {
+      category = await Category.findByPk(o.categoryId);
+      if (!category) {
+        setKey(categoryKey, { msg: "not found" });
+        throw new NotFound("分类不存在！");
+      }
+      setKey(categoryKey, category);
+    } else if (category.msg === "not found") throw new NotFound("分类不存在！");
+    if (!good) {
+      good = await Good.findByPk(o.categoryId);
+      if (!good) {
+        setKey(categoryKey, { msg: "not found" });
+        throw new NotFound("商品不存在！");
+      }
+      setKey(goodKey, good);
+    } else if (good.msg === "not found") throw new NotFound("商品不存在！");
+    let { typeId, sizeId } = category;
+    let type, size;
+    if (typeId) {
+      let typeKey = `type:${typeId}`;
+      type = await getKey(typeKey);
+      if (!type) {
+        type = await Type.findByPk(typeId);
+        if (!type) {
+          setKey(typeKey, { msg: "not found" });
+          throw new NotFound("类型不存在！");
+        }
+        setKey(typeKey, type);
+      } else if (type.msg === "not found") throw new NotFound("类型不存在！");
+    }
+    if (sizeId) {
+      let sizeKey = `size:${sizeId}`;
+      size = await getKey(sizeKey);
+      if (!size) {
+        size = await Size.findByPk(sizeId);
+        if (!size) {
+          setKey(sizeKey, { msg: "not found" });
+          throw new NotFound("类型不存在！");
+        }
+        setKey(sizeKey, size);
+      } else if (size.msg === "not found") throw new NotFound("类型不存在！");
+    }
+    return {
+      ...o.dataValues,
+      name: good.name,
+      type: type?.name || null,
+      size: size?.name || null,
+      shop: good.shop,
+    };
+  });
+}
+
+/**
+ * 获取订单列表
+ * GET /orders
+ */
+router.get("/", async function (req, res, next) {
+  try {
+    const { userId } = req;
+    // cacheKey不要加用户id，会导致缓存命中率下降
+    const currentPage = Math.abs(req.query.currentPage) || 1;
+    const pageSize = Math.abs(req.query.pageSize) || 10;
+    const offset = (currentPage - 1) * pageSize;
+    const cacheKey = `orders:${userId}:${currentPage}:${pageSize}`;
+    let countAndOrders = await getKey(cacheKey);
+    let count, orders;
+    if (countAndOrders) {
+      count = countAndOrders.count;
+      orders = countAndOrders.orders;
+    }
+    if (!orders) {
+      const { count, rows } = await Order.findAndCountAll({
+        attributes: { exclude: ["id"] },
+        where: {
+          userId,
+        },
+        limit: pageSize,
+        offset,
+      });
+      orders = await Promise.all(bindGoodInfoWithOrder(rows));
+      setKey(cacheKey, { orders, count });
+    }
+    success(res, "获取订单成功", {
+      orders,
+      total: count,
+      currentPage,
+      pageSize,
+    });
+  } catch (e) {
+    failure(res, e, "获取订单失败");
+  }
+});
+
+/**
+ * 获取未支付订单列表
+ * GET /orders/unpay
+ */
+router.get("/unpay", async function (req, res, next) {
+  try {
+    const { userId } = req;
+    // cacheKey不要加用户id，会导致缓存命中率下降
+    const currentPage = Math.abs(req.query.currentPage) || 1;
+    const pageSize = Math.abs(req.query.pageSize) || 10;
+    const offset = (currentPage - 1) * pageSize;
+    const cacheKey = `unpay-orders:${userId}:${currentPage}:${pageSize}`;
+    let countAndOrders = await getKey(cacheKey);
+    let count, orders;
+    if (countAndOrders) {
+      count = countAndOrders.count;
+      orders = countAndOrders.orders;
+    }
+    if (!orders) {
+      const { count, rows } = await Order.findAndCountAll({
+        attributes: { exclude: ["id"] },
+        where: {
+          userId,
+          status: 0,
+        },
+        limit: pageSize,
+        offset,
+      });
+      orders = await Promise.all(bindGoodInfoWithOrder(rows));
+      setKey(cacheKey, { orders, count });
+    }
+    success(res, "获取订单成功", {
+      orders,
+      total: count,
+      currentPage,
+      pageSize,
+    });
+  } catch (e) {
+    failure(res, e, "获取订单失败");
+  }
+});
 
 /**
  * 新增订单
@@ -271,43 +422,4 @@ router.get("/:orderid", async function (req, res, next) {
   }
 });
 
-/**
- * 获取订单列表
- * GET /orders
- */
-router.get("/", async function (req, res, next) {
-  try {
-    const { userId } = req;
-    // cacheKey不要加用户id，会导致缓存命中率下降
-    const cacheKey = `orders:${userId}`;
-    let orders = await getKey(cacheKey);
-    console.log("userId", userId);
-    if (!orders) {
-      // 分别查询已支付和未支付订单
-      const unpayOrders = await Order.findAll({
-        attributes: { exclude: ["id"] },
-        where: {
-          status: 0,
-          userId,
-        },
-      });
-      const otherOrders = await Order.findAll({
-        attributes: { exclude: ["id"] },
-        where: {
-          status: {
-            [Op.in]: [1, 2],
-          },
-          userId,
-        },
-      });
-      console.log("unpay", unpayOrders, "other", otherOrders);
-      orders = { unpayOrders, otherOrders };
-      setKey(cacheKey, orders);
-    }
-    setKey(cacheKey, orders);
-    success(res, "获取订单成功", { orders });
-  } catch (e) {
-    failure(res, e, "获取订单失败");
-  }
-});
 module.exports = router;
