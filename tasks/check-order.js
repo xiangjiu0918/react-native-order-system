@@ -7,10 +7,10 @@ const { delKey, setKey } = require("../utils/redis");
 
 /**
  * 定时检查并处理超时未支付订单
- * 每十五分钟 执行一次
+ * 每天四点半处理一次，给延迟队列兜底
  */
 function scheduleOrderCheck() {
-  schedule.scheduleJob("0 * * * * *", async () => {
+  schedule.scheduleJob("0 30 4 * * *", async () => {
     const t = await sequelize.transaction();
 
     try {

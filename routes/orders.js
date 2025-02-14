@@ -4,7 +4,7 @@ const { sequelize, Order, Address, Category } = require("../models");
 const { success, failure } = require("../utils/responses");
 const { NotFound, BadRequest } = require("http-errors");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
-const { Op } = require("sequelize");
+const { Op, where } = require("sequelize");
 const { v4: uuidv4 } = require("uuid");
 const { delayOrderProducer } = require("../utils/rabbit-mq");
 
@@ -20,6 +20,28 @@ function filterBody(req) {
     addressId: req.body.addressId,
     num: req.body.num,
   };
+}
+
+/**
+ * 清除缓存
+ * @returns {Promise<void>}
+ */
+async function clearCache(id = null) {
+  // 清除所有订单列表缓存
+  const keys = await getKeysByPattern("orders:*");
+
+  if (keys.length !== 0) {
+    await delKey(keys);
+  }
+
+  // 如果传递了id，则通过id清除订单详情缓存
+  if (id) {
+    // 如果是数组，则遍历
+    const keys = Array.isArray(id)
+      ? id.map((item) => `order:${item}`)
+      : `order:${id}`;
+    await delKey(keys);
+  }
 }
 
 /**
@@ -104,11 +126,13 @@ router.post("/", async function (req, res, next) {
       transaction: t,
       lock: true,
     });
+    // 删除订单列表缓存
+    clearCache();
     await setKey(`order:${order.orderid}`, order);
     delete order.dataValues.id;
     await setKey(categoryKey, category);
     // 创建延迟队列，15分钟后自动取消订单
-    delayOrderProducer(order.orderid, 1 * 60 * 1000);
+    delayOrderProducer(order.orderid, 15 * 60 * 1000);
     await t.commit();
     success(res, "创建订单成功", {
       order,
@@ -168,6 +192,8 @@ router.put("/pay/:orderid", async function (req, res, next) {
     );
     delete order.dataValues.id;
     setKey(orderKey, order);
+    // 删除订单列表缓存
+    clearCache();
     t.commit();
     success(res, "支付成功", { order });
   } catch (e) {
@@ -178,7 +204,7 @@ router.put("/pay/:orderid", async function (req, res, next) {
 });
 
 /**
- * 获取订单
+ * 获取单个订单
  * GET /orders/:orderid
  */
 router.get("/:orderid", async function (req, res, next) {
@@ -189,31 +215,99 @@ router.get("/:orderid", async function (req, res, next) {
     let order = await getKey(cacheKey);
     if (!order) {
       order = await Order.findOne({
-        where: {
-          userId: req.userId,
-          orderid,
-        },
-        include: [
-          {
-            model: Category,
-            as: "category",
-            attributes: ["typeId", "sizeId"],
-          },
-        ],
+        where: { orderid },
       });
       if (!order) {
-        throw new NotFound(`orderid: ${orderid}的订单未找到。`);
-      } else if (order.dataValues.userId !== req.userId) {
-        throw new BadRequest("用户id和订单id不匹配！");
+        // 特殊处理
+        setKey(cacheKey, { msg: "not found" });
+        throw new NotFound("订单不存在！");
       }
-      await setKey(cacheKey, order);
-    } else if (order.userId !== req.userId) {
-      throw new BadRequest("用户id和订单id不匹配！");
-    }
+      setKey(cacheKey, order);
+      if (order.dataValues.userId !== req.userId)
+        throw new BadRequest("订单id和用户id不匹配！");
+      delete order.dataValues.id;
+    } else if (order.msg === "not found") throw new NotFound("订单不存在！");
+    else if (order.userId !== req.userId) {
+      throw new BadRequest("订单id和用户id不匹配！");
+    } else delete order.id;
+    setKey(cacheKey, order);
     success(res, "获取订单成功", { order });
   } catch (e) {
     failure(res, e, "获取订单失败");
   }
 });
 
+/**
+ * 获取订单列表
+ * GET /orders/:orderid
+ */
+router.get("/:orderid", async function (req, res, next) {
+  try {
+    const { orderid } = req.params;
+    // cacheKey不要加用户id，会导致缓存命中率下降
+    const cacheKey = `order:${orderid}`;
+    let order = await getKey(cacheKey);
+    if (!order) {
+      order = await Order.findOne({
+        where: { orderid },
+      });
+      if (!order) {
+        // 特殊处理
+        setKey(cacheKey, { msg: "not found" });
+        throw new NotFound("订单不存在！");
+      }
+      setKey(cacheKey, order);
+      if (order.dataValues.userId !== req.userId)
+        throw new BadRequest("订单id和用户id不匹配！");
+      delete order.dataValues.id;
+    } else if (order.msg === "not found") throw new NotFound("订单不存在！");
+    else if (order.userId !== req.userId) {
+      throw new BadRequest("订单id和用户id不匹配！");
+    } else delete order.id;
+    setKey(cacheKey, order);
+    success(res, "获取订单成功", { order });
+  } catch (e) {
+    failure(res, e, "获取订单失败");
+  }
+});
+
+/**
+ * 获取订单列表
+ * GET /orders
+ */
+router.get("/", async function (req, res, next) {
+  try {
+    const { userId } = req;
+    // cacheKey不要加用户id，会导致缓存命中率下降
+    const cacheKey = `orders:${userId}`;
+    let orders = await getKey(cacheKey);
+    console.log("userId", userId);
+    if (!orders) {
+      // 分别查询已支付和未支付订单
+      const unpayOrders = await Order.findAll({
+        attributes: { exclude: ["id"] },
+        where: {
+          status: 0,
+          userId,
+        },
+      });
+      const otherOrders = await Order.findAll({
+        attributes: { exclude: ["id"] },
+        where: {
+          status: {
+            [Op.in]: [1, 2],
+          },
+          userId,
+        },
+      });
+      console.log("unpay", unpayOrders, "other", otherOrders);
+      orders = { unpayOrders, otherOrders };
+      setKey(cacheKey, orders);
+    }
+    setKey(cacheKey, orders);
+    success(res, "获取订单成功", { orders });
+  } catch (e) {
+    failure(res, e, "获取订单失败");
+  }
+});
 module.exports = router;
