@@ -129,6 +129,7 @@ router.get("/:id", async function (req, res, next) {
         let transTypes = [];
         let transSizes = [];
         let price = Infinity; // 商品默认展示最低价格
+        let allStockout = true; // 所有种类是否售罄
         if (types.length > 0) {
           await Promise.all(
             types.map(async (t, index) => {
@@ -142,6 +143,7 @@ router.get("/:id", async function (req, res, next) {
                 group: ["typeId"],
                 where: { typeId: t.dataValues.id },
               });
+              if (r.dataValues.inventory > 0) allStockout = false;
               transTypes.push({
                 ...t.dataValues,
                 thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
@@ -172,6 +174,7 @@ router.get("/:id", async function (req, res, next) {
                         }),
                       ]);
                       c = arr[1];
+                      if (arr[0].dataValues.inventory > 0) allStockout = false;
                       transSizes.push({
                         ...s.dataValues,
                         stockout:
@@ -186,7 +189,7 @@ router.get("/:id", async function (req, res, next) {
                         },
                       });
                     }
-                    console.log("c", c);
+                    if (c.dataValues.inventory > 0) allStockout = false;
                     categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
                       ...c.dataValues,
                       price: Number(c.dataValues.price),
@@ -203,6 +206,7 @@ router.get("/:id", async function (req, res, next) {
                     sizeId: null,
                   },
                 });
+                if (c.dataValues.inventory > 0) allStockout = false;
                 categories[`${t.dataValues.id}:-1`] = {
                   ...c.dataValues,
                   price: Number(c.dataValues.price),
@@ -241,6 +245,7 @@ router.get("/:id", async function (req, res, next) {
                   ...s.dataValues,
                   stockout: arr[0]?.dataValues.inventory <= 0 ? true : false,
                 });
+                if (arr[0].dataValues.inventory > 0) allStockout = false;
                 categories[`-1:${s.dataValues.id}`] = {
                   ...c.dataValues,
                   price: Number(c.dataValues.price),
@@ -255,6 +260,7 @@ router.get("/:id", async function (req, res, next) {
                 goodId: id,
               },
             });
+            if (c.dataValues.inventory > 0) allStockout = false;
             categories["-1:-1"] = {
               ...c.dataValues,
               price: Number(c.dataValues.price),
@@ -267,6 +273,7 @@ router.get("/:id", async function (req, res, next) {
             ...good.dataValues,
             previewUrl,
             price,
+            stockout: allStockout,
           },
           types: transTypes.sort((a, b) => a.id - b.id),
           sizes: transSizes.sort((a, b) => a.id - b.id),
