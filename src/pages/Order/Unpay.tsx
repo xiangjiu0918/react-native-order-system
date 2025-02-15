@@ -1,25 +1,57 @@
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
-import React from 'react';
-import Card from './components/Card'
+import {FlatList, StyleSheet} from "react-native";
+import React, {useState, useEffect, useRef} from "react";
+import {EventRegister} from "react-native-event-listeners";
+import Card, {type CardProp} from "./components/Card";
+import axios from "@/utils/axios";
+import alert from "@/utils/alert";
 
 export default function Unpay() {
+  const [data, changeData] = useState<CardProp[]>([]);
+  const currentPage = useRef(1);
+  const end = useRef(false);
+  const pageSize = 10;
+  useEffect(() => {
+    getData();
+    const payListener = EventRegister.addEventListener("pay", getData);
+    return () => {
+      EventRegister.removeEventListener(payListener as string);
+    };
+  }, []);
+  async function getData() {
+    try {
+      if (!end.current) {
+        const res = await axios.get("/orders/unpay", {
+          params: {
+            currentPage: currentPage.current,
+            pageSize,
+          },
+        });
+        const newOrders = [...data, ...res.data?.data?.orders];
+        changeData(newOrders);
+        if (currentPage.current * pageSize < res.data?.data?.total) {
+          currentPage.current += 1;
+        } else {
+          end.current = true;
+        }
+      }
+    } catch (e) {
+      alert();
+    }
+  }
+
   return (
-    // <ScrollView style={UnpayStyle.container}>
-    //   <View style={UnpayStyle.scroll}>
-    //     <Card />
-    //     <Card />
-    //   </View>
-    // </ScrollView>
-    <View>
-      <Text>unpay</Text>
-    </View>
-  )
+    <FlatList
+      contentContainerStyle={UnpayStyle.scroll}
+      data={data}
+      onEndReached={getData}
+      onEndReachedThreshold={0.5}
+      renderItem={({item}: {item: CardProp}) => <Card {...item} />}
+    />
+  );
 }
 
 const UnpayStyle = StyleSheet.create({
-  container: {
-    flex: 1,
-  }, scroll: {
+  scroll: {
     padding: 10,
     gap: 10,
   },

@@ -1,7 +1,7 @@
-import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
-import React from 'react';
-import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {View, Text, Image, Pressable, StyleSheet} from "react-native";
+import React from "react";
+import {useNavigation} from "@react-navigation/native";
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
 
 export interface CardProp {
   id: number;
@@ -16,13 +16,13 @@ export default function Card(props: CardProp) {
   return (
     <Pressable
       style={CardStyle.container}
-      onPress={() => navigation.navigate('Detail', {id: props.id})}>
+      onPress={() => navigation.navigate("Detail", {id: props.id})}>
       {props.previewUrl !== undefined ? (
         <Image style={CardStyle.image} source={{uri: props.previewUrl}} />
       ) : (
         <Image
           style={CardStyle.image}
-          source={require('@/static/defaultAvator.jpeg')}
+          source={require("@/static/defaultAvatar.jpeg")}
         />
       )}
       <View>
@@ -41,10 +41,10 @@ export default function Card(props: CardProp) {
 const CardStyle = StyleSheet.create({
   container: {
     width: 185,
-    overflow: 'hidden',
+    overflow: "hidden",
     padding: 10,
     borderRadius: 5,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     gap: 10,
   },
   image: {
@@ -52,18 +52,18 @@ const CardStyle = StyleSheet.create({
     height: 165,
   },
   bottomBar: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   price: {
-    color: 'orange',
+    color: "orange",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

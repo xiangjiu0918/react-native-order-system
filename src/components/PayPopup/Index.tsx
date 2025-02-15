@@ -14,6 +14,7 @@ import {type BasePopupProp} from "@/components/Popup/Index";
 import {useAppSelector} from "@/store/hooks";
 import axios from "@/utils/axios";
 import {AxiosError} from "axios";
+import {EventRegister} from "react-native-event-listeners";
 
 interface PayPopup extends BasePopupProp {
   price: number;
@@ -30,6 +31,7 @@ export default function Index(props: PayPopup) {
       await axios.put(`/orders/pay/${props.orderid}`);
       changSipnnerVisible(false);
       ToastAndroid.show("支付成功", ToastAndroid.LONG);
+      EventRegister.emit("pay");
     } catch (e) {
       changSipnnerVisible(false);
       Alert.alert("提示", JSON.stringify(e as AxiosError), [
@@ -90,6 +92,7 @@ const PayStyle = StyleSheet.create({
   container: {
     backgroundColor: "white",
     padding: 15,
+    flex: 1,
   },
   amount: {
     fontSize: 35,

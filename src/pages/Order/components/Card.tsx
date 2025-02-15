@@ -5,40 +5,40 @@ import {
   StyleSheet,
   LayoutChangeEvent,
   Pressable,
-} from 'react-native';
-import React, {useCallback, useEffect, useState} from 'react';
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import PayPopup from '@/components/PayPopup/Index';
+} from "react-native";
+import React, {useCallback, useEffect, useState} from "react";
+import dayjs from "dayjs";
+import duration from "dayjs/plugin/duration";
+import PayPopup from "@/components/PayPopup/Index";
 
 dayjs.extend(duration);
 
 export interface CardProp {
-  id: number;
+  orderid: string;
   shop: string;
-  title: string;
+  name: string;
+  previewUrl: string;
   type: string;
-  price: string;
+  price: number;
   num: number;
-  status: STATUS;
-  time?: duration.Duration;
+  status: number;
+  orderTime: string;
 }
 
-export enum STATUS {
-  PAY,
-  UNPAY,
-  CANCEL,
-}
+const UNPAY = 0;
+const PAY = 1;
+const CANCEL = 2;
 
 export default function Card(props: CardProp) {
   let cardWidth = 0;
   let priceWidth = 0;
-  let havePay = props.status === STATUS.PAY;
   let timer: NodeJS.Timeout;
   const [width, setWidth] = useState(0);
-  const [limit, setLimit] = useState(props.time || dayjs.duration(15, 'm'));
+  const [limit, setLimit] = useState(
+    15 * 60 * 1000 - (Date.now() - Date.parse(props.orderTime)),
+  );
   const [payVisible, changePayVisible] = useState(false);
-  let cntLimit = props.time || dayjs.duration(15, 'm');
+  let cntLimit = limit;
   const handlePriceWidth = (event: LayoutChangeEvent) => {
     priceWidth = event.nativeEvent.layout.width;
     if (cardWidth > 0) {
@@ -52,14 +52,14 @@ export default function Card(props: CardProp) {
     }
   };
   useEffect(() => {
-    if (timer === undefined && havePay === false) {
+    if (timer === undefined && props.status === UNPAY) {
       timer = setInterval(() => {
         // setInterval的回调函数在初始化时就被定义，所以无法感知到状态的更新
         //需要用useRef或者是辅助变量来解决
-        if (cntLimit.asSeconds() === 0) {
+        if (cntLimit === 0) {
           clearInterval(timer);
         } else {
-          cntLimit = cntLimit.subtract(1, 's');
+          cntLimit = cntLimit - 1000;
           setLimit(cntLimit);
         }
       }, 1000);
@@ -71,43 +71,44 @@ export default function Card(props: CardProp) {
         <View style={CardStyle.topBar}>
           <Text style={CardStyle.main}>{props.shop}</Text>
           <Text style={CardStyle.status}>
-            {havePay === true
-              ? '买家已付款'
-              : limit.asSeconds() === 0
-              ? '订单已取消'
-              : '订单未支付'}
+            {props.status === 2
+              ? "订单已取消"
+              : props.status === 1
+              ? "买家已付款"
+              : limit >= 0
+              ? "订单未支付"
+              : "订单已取消"}
           </Text>
         </View>
         <View style={CardStyle.detail} onLayout={handleCardWidth}>
-          <Image
-            style={CardStyle.image}
-            source={require('@/static/defaultAvator.jpeg')}
-          />
-          <View style={{width, overflow: 'hidden'}}>
+          <Image style={CardStyle.image} source={{uri: props.previewUrl}} />
+          <View style={{width, overflow: "hidden"}}>
             <Text style={CardStyle.main} numberOfLines={1}>
-              {props.title}
+              {props.name}
             </Text>
             <Text>{props.type}</Text>
           </View>
-          <View onLayout={handlePriceWidth} style={{alignItems: 'flex-end'}}>
-            <Text style={CardStyle.main}>{props.price}</Text>
+          <View onLayout={handlePriceWidth} style={{alignItems: "flex-end"}}>
+            <Text style={CardStyle.main}>￥{props.price}</Text>
             <Text>x{props.num}</Text>
           </View>
         </View>
-        {havePay === true || limit.asSeconds() === 0 ? (
+        {props.status !== 0 || (props.status === 0 && limit <= 0) ? (
           <></>
         ) : (
           <View style={CardStyle.bottomBar}>
-            <Text>支付时间剩余{limit.format('mm:ss')}</Text>
+            <Text>支付时间剩余{dayjs(limit).format("mm:ss")}</Text>
             <Pressable
               style={CardStyle.button}
               onPress={() => changePayVisible(true)}>
-              <Text style={{color: '#2196F3'}}>去支付</Text>
+              <Text style={{color: "#2196F3"}}>去支付</Text>
             </Pressable>
           </View>
         )}
       </View>
       <PayPopup
+        price={props.price}
+        orderid={props.orderid}
         visible={payVisible}
         handleVisible={() => changePayVisible(false)}
       />
@@ -119,14 +120,14 @@ const CardStyle = StyleSheet.create({
   container: {
     padding: 15,
     gap: 15,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   detail: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "flex-start",
     gap: 10,
   },
   image: {
@@ -134,14 +135,14 @@ const CardStyle = StyleSheet.create({
     width: 80,
   },
   main: {
-    color: 'black',
+    color: "black",
     fontSize: 18,
   },
   bottomBar: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
   },
   button: {
@@ -149,15 +150,15 @@ const CardStyle = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2196F3',
+    borderColor: "#2196F3",
   },
   status: {
-    color: '#2196F3',
+    color: "#2196F3",
   },
   topBar: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 });

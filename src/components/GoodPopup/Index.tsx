@@ -61,6 +61,7 @@ export default function GoodPopup(props: GoodPopupProp) {
   const [types, changeTypes] = useState(props.types);
   const [sizes, changeSizes] = useState(props.sizes);
   const [price, changePrice] = useState(props.defaultPrice);
+  const [previewUrl, changePreviewUrl] = useState(props.defaultThumbnail);
   const [selectAddress, changeSelectAddress] = useState(
     address.default === null
       ? address.list[0]
@@ -90,6 +91,7 @@ export default function GoodPopup(props: GoodPopupProp) {
     changeTypes(props.types);
     changeSizes(props.sizes);
     changePrice(props.defaultPrice);
+    changePreviewUrl(props.defaultThumbnail);
     initData();
   }, [props]);
   const initData = async () => {
@@ -207,14 +209,15 @@ export default function GoodPopup(props: GoodPopupProp) {
       }
     }
   };
-  const handlePressType = (typeId: number) => {
+  const handlePressType = (type: TypesItem) => {
     // 根据选择的商品类型判断size是否可选
     return () => {
-      if (selectTypeId === typeId) {
+      if (selectTypeId === type.id) {
         // 取消逻辑
         changeTypeId(-1);
         // 改回默认价格
         changePrice(props.defaultPrice);
+        changePreviewUrl(props.defaultThumbnail);
         if (selectSizeId === -1) {
           // 展示接口传来的size和type
           changeTypes(props.types);
@@ -234,13 +237,14 @@ export default function GoodPopup(props: GoodPopupProp) {
           changeSizes(props.sizes);
         }
       } else {
+        changePreviewUrl(type.thumbnailUrl);
         // 只有单选types时才需要过滤size，因为已经选择的size一定是可选的
         if (sizes.length > 0 && selectSizeId === -1) {
           const newSizes = sizes.map(item => {
             return {
               ...item,
               stockout:
-                categories[`${typeId}:${item.id}`].inventory <= 0
+                categories[`${type.id}:${item.id}`].inventory <= 0
                   ? true
                   : false,
             };
@@ -248,9 +252,9 @@ export default function GoodPopup(props: GoodPopupProp) {
           changeSizes(newSizes);
         } else {
           // 修改价格
-          changePrice(categories[`${typeId}:${selectSizeId}`].price);
+          changePrice(categories[`${type.id}:${selectSizeId}`].price);
         }
-        changeTypeId(typeId);
+        changeTypeId(type.id);
       }
     };
   };
@@ -354,7 +358,7 @@ export default function GoodPopup(props: GoodPopupProp) {
             <Image
               style={PopupStyle.picture}
               resizeMode="contain"
-              source={{uri: props.defaultThumbnail}}
+              source={{uri: previewUrl}}
             />
             <View style={{justifyContent: "space-between"}}>
               <Text style={PopupStyle.price}>￥{price}</Text>
@@ -397,7 +401,7 @@ export default function GoodPopup(props: GoodPopupProp) {
                         : PopupStyle.typeWrap,
                       item.stockout ? {opacity: 0.5} : {opacity: 1},
                     ]}
-                    onPress={handlePressType(item.id)}>
+                    onPress={handlePressType(item)}>
                     <Image
                       style={{height: 30, width: 30}}
                       resizeMode="contain"
@@ -513,6 +517,7 @@ const PopupStyle = StyleSheet.create({
     backgroundColor: "white",
     padding: 15,
     gap: 10,
+    flex: 1,
   },
   pictureNumWrap: {
     height: 80,

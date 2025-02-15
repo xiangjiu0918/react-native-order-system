@@ -122,7 +122,7 @@ export default function Users({navigation}: {navigation: NavigationProp<any>}) {
         ) : (
           <Image
             style={UserStyle.image}
-            source={require("@/static/defaultAvator.jpeg")}
+            source={require("@/static/defaultAvatar.jpeg")}
           />
         )}
         <View style={[UserStyle.infoContainer, {width}]}>

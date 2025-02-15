@@ -54,7 +54,7 @@ export default function Index({
     try {
       const res = await axios.get(`goods/${id}`);
       // console.log("res", res.data.data);
-      const {name, sale, district, postage, previewUrl, price} =
+      const {name, sale, district, postage, previewUrl, price, timeOfSale} =
         res.data.data.good;
       const {types, sizes, categories} = res.data.data;
       setName(name);
@@ -63,6 +63,7 @@ export default function Index({
       setDistrict(district);
       setPostage(postage);
       setPreviewUrl(previewUrl);
+      changeOnSale(Date.parse(timeOfSale) <= Date.now());
       typesRef.current = types;
       sizesRef.current = sizes;
       categoriesRef.current = categories;
@@ -74,7 +75,7 @@ export default function Index({
   return (
     <>
       <ScrollView style={DetailStyle.container}>
-        {previewUrl.length > 0 ? (
+        {previewUrl.length > 1 ? (
           <Swiper loop={true} height={windowWidth}>
             {previewUrl.map((item, index) => (
               <Image
@@ -85,19 +86,18 @@ export default function Index({
               />
             ))}
           </Swiper>
+        ) : previewUrl.length === 1 ? (
+          <Image
+            style={DetailStyle.image}
+            resizeMode="contain"
+            source={{uri: previewUrl[0]}}
+          />
         ) : (
-          <Swiper loop={true} height={windowWidth}>
-            <Image
-              style={DetailStyle.image}
-              resizeMode="contain"
-              source={require("@/static/defaultAvator.jpeg")}
-            />
-            <Image
-              style={DetailStyle.image}
-              resizeMode="contain"
-              source={require("@/static/defaultAvator.jpeg")}
-            />
-          </Swiper>
+          <Image
+            style={DetailStyle.image}
+            resizeMode="contain"
+            source={require("@/static/defaultAvatar.jpeg")}
+          />
         )}
         <View style={DetailStyle.detailWrap}>
           <View style={DetailStyle.textWrap}>
@@ -136,7 +136,7 @@ export default function Index({
               <Image
                 style={DetailStyle.image}
                 resizeMode="contain"
-                source={require("@/static/defaultAvator.jpeg")}
+                source={require("@/static/defaultAvatar.jpeg")}
               />
             )}
           </View>

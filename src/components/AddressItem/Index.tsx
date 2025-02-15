@@ -1,6 +1,6 @@
 import {
   View,
-  ScrollView,
+  FlatList,
   Text,
   StyleSheet,
   useWindowDimensions,
@@ -9,7 +9,7 @@ import {
   ToastAndroid,
 } from "react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useState, useRef} from "react";
 import {useHeaderHeight} from "@react-navigation/elements";
 import Icons from "react-native-vector-icons/AntDesign";
 import {useNavigation} from "@react-navigation/native";
@@ -17,7 +17,7 @@ import {NativeStackNavigationProp} from "@react-navigation/native-stack";
 import {EventRegister} from "react-native-event-listeners";
 import axios from "@/utils/axios";
 import {useAppSelector, useAppDispatch} from "@/store/hooks";
-import {initList} from "@/store/slice/addressSlice";
+import {initList, appendList} from "@/store/slice/addressSlice";
 import {
   AddressStore,
   changeItem,
@@ -44,16 +44,25 @@ export default function AddressItem({
     useHeaderHeight() -
     (StatusBar.currentHeight || 0);
   const [manageMode, switchMode] = useState(false);
+  const currentPage = useRef(1);
+  const end = useRef(false);
+  const pageSize = 10;
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   EventRegister.addEventListener("manageAddress", () => switchMode(true));
   EventRegister.addEventListener("existManage", () => switchMode(false));
   useEffect(() => {
-    initAddress();
+    getAddress();
   }, []);
-  function initAddress() {
-    axios.get("/addresses").then(
-      res => {
-        const {addresses: list, defaultId} = res.data?.data;
+  async function getAddress() {
+    try {
+      const res = await axios.get("/addresses", {
+        params: {
+          currentPage: currentPage.current,
+          pageSize,
+        },
+      });
+      const {addresses: list, defaultId} = res.data?.data;
+      if (currentPage.current === 1) {
         if (list.length > 0) {
           dispatch(
             initList({
@@ -62,11 +71,19 @@ export default function AddressItem({
             }),
           );
         }
-      },
-      err => {
-        alert();
-      },
-    );
+      } else {
+        if (list.length > 0) {
+          dispatch(appendList(list));
+        }
+      }
+      if (currentPage.current * pageSize < res.data?.data?.total) {
+        currentPage.current += 1;
+      } else {
+        end.current = true;
+      }
+    } catch (e) {
+      alert();
+    }
   }
   function handleEdit(address: AddressStore) {
     return () => {
@@ -129,91 +146,180 @@ export default function AddressItem({
     };
   }
   return (
-    <ScrollView style={AddressStyle.container}>
+    <>
       {address.list.length > 0 ? (
-        <></>
+        <FlatList
+          style={AddressStyle.container}
+          data={address.list}
+          renderItem={({item}: {item: any}) => (
+            <Pressable
+              key={item.id}
+              style={[
+                AddressStyle.item,
+                item.id === selectItem?.id ? {backgroundColor: "#fff1eb"} : {},
+              ]}
+              onPress={() => changeSelectItem && changeSelectItem(item)}>
+              <View style={AddressStyle.abstract}>
+                <View style={{gap: 5}}>
+                  <Text
+                    style={[
+                      AddressStyle.distinct,
+                      item.id === selectItem?.id ? {color: "#ff6600"} : {},
+                    ]}>
+                    {item.district.join(" ")}
+                  </Text>
+                  <Text
+                    style={[
+                      AddressStyle.mainText,
+                      item.id === selectItem?.id ? {color: "#ff6600"} : {},
+                    ]}>
+                    {item.detail}
+                  </Text>
+                  <View style={AddressStyle.line}>
+                    <Text
+                      style={[
+                        AddressStyle.nameTel,
+                        item.id === selectItem?.id ? {color: "#ff6600"} : {},
+                      ]}>
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={[
+                        AddressStyle.nameTel,
+                        item.id === selectItem?.id ? {color: "#ff6600"} : {},
+                      ]}>
+                      {item.tel}
+                    </Text>
+                    {item.id === address.default ? (
+                      <Text style={AddressStyle.default}>默认</Text>
+                    ) : (
+                      <></>
+                    )}
+                  </View>
+                </View>
+                <Icons name="edit" size={20} onPress={handleEdit(item)} />
+              </View>
+              {manageMode === true ? (
+                <View style={AddressStyle.manageBar}>
+                  <View style={AddressStyle.line}>
+                    <CheckBox
+                      value={address.default === item.id}
+                      onValueChange={handleDefault(item)}
+                    />
+                    <Text>默认</Text>
+                  </View>
+                  <View style={AddressStyle.line}>
+                    <Pressable
+                      style={AddressStyle.button}
+                      onPress={handleDelete(item.id)}>
+                      <Text style={AddressStyle.btnText}>删除</Text>
+                    </Pressable>
+                    <Pressable
+                      style={AddressStyle.button}
+                      onPress={handleCopy(item)}>
+                      <Text style={AddressStyle.btnText}>复制</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <></>
+              )}
+            </Pressable>
+          )}
+          onEndReached={getAddress}
+          onEndReachedThreshold={0.5}
+        />
       ) : (
         <View style={[AddressStyle.empty]}>
           <Text>暂无收货人信息</Text>
         </View>
       )}
-      {address.list.map(item => (
-        <Pressable
-          key={item.id}
-          style={[
-            AddressStyle.item,
-            item.id === selectItem?.id ? {backgroundColor: "#fff1eb"} : {},
-          ]}
-          onPress={() => changeSelectItem && changeSelectItem(item)}>
-          <View style={AddressStyle.abstract}>
-            <View style={{gap: 5}}>
-              <Text
-                style={[
-                  AddressStyle.distinct,
-                  item.id === selectItem?.id ? {color: "#ff6600"} : {},
-                ]}>
-                {item.district.join(" ")}
-              </Text>
-              <Text
-                style={[
-                  AddressStyle.mainText,
-                  item.id === selectItem?.id ? {color: "#ff6600"} : {},
-                ]}>
-                {item.detail}
-              </Text>
-              <View style={AddressStyle.line}>
-                <Text
-                  style={[
-                    AddressStyle.nameTel,
-                    item.id === selectItem?.id ? {color: "#ff6600"} : {},
-                  ]}>
-                  {item.name}
-                </Text>
-                <Text
-                  style={[
-                    AddressStyle.nameTel,
-                    item.id === selectItem?.id ? {color: "#ff6600"} : {},
-                  ]}>
-                  {item.tel}
-                </Text>
-                {item.id === address.default ? (
-                  <Text style={AddressStyle.default}>默认</Text>
-                ) : (
-                  <></>
-                )}
-              </View>
-            </View>
-            <Icons name="edit" size={20} onPress={handleEdit(item)} />
-          </View>
-          {manageMode === true ? (
-            <View style={AddressStyle.manageBar}>
-              <View style={AddressStyle.line}>
-                <CheckBox
-                  value={address.default === item.id}
-                  onValueChange={handleDefault(item)}
-                />
-                <Text>默认</Text>
-              </View>
-              <View style={AddressStyle.line}>
-                <Pressable
-                  style={AddressStyle.button}
-                  onPress={handleDelete(item.id)}>
-                  <Text style={AddressStyle.btnText}>删除</Text>
-                </Pressable>
-                <Pressable
-                  style={AddressStyle.button}
-                  onPress={handleCopy(item)}>
-                  <Text style={AddressStyle.btnText}>复制</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <></>
-          )}
-        </Pressable>
-      ))}
-    </ScrollView>
+    </>
   );
+  // <ScrollView style={AddressStyle.container}>
+  //   {address.list.length > 0 ? (
+  //     <></>
+  //   ) : (
+  //     <View style={[AddressStyle.empty]}>
+  //       <Text>暂无收货人信息</Text>
+  //     </View>
+  //   )}
+  //   {address.list.map(item => (
+  //     <Pressable
+  //       key={item.id}
+  //       style={[
+  //         AddressStyle.item,
+  //         item.id === selectItem?.id ? {backgroundColor: "#fff1eb"} : {},
+  //       ]}
+  //       onPress={() => changeSelectItem && changeSelectItem(item)}>
+  //       <View style={AddressStyle.abstract}>
+  //         <View style={{gap: 5}}>
+  //           <Text
+  //             style={[
+  //               AddressStyle.distinct,
+  //               item.id === selectItem?.id ? {color: "#ff6600"} : {},
+  //             ]}>
+  //             {item.district.join(" ")}
+  //           </Text>
+  //           <Text
+  //             style={[
+  //               AddressStyle.mainText,
+  //               item.id === selectItem?.id ? {color: "#ff6600"} : {},
+  //             ]}>
+  //             {item.detail}
+  //           </Text>
+  //           <View style={AddressStyle.line}>
+  //             <Text
+  //               style={[
+  //                 AddressStyle.nameTel,
+  //                 item.id === selectItem?.id ? {color: "#ff6600"} : {},
+  //               ]}>
+  //               {item.name}
+  //             </Text>
+  //             <Text
+  //               style={[
+  //                 AddressStyle.nameTel,
+  //                 item.id === selectItem?.id ? {color: "#ff6600"} : {},
+  //               ]}>
+  //               {item.tel}
+  //             </Text>
+  //             {item.id === address.default ? (
+  //               <Text style={AddressStyle.default}>默认</Text>
+  //             ) : (
+  //               <></>
+  //             )}
+  //           </View>
+  //         </View>
+  //         <Icons name="edit" size={20} onPress={handleEdit(item)} />
+  //       </View>
+  //       {manageMode === true ? (
+  //         <View style={AddressStyle.manageBar}>
+  //           <View style={AddressStyle.line}>
+  //             <CheckBox
+  //               value={address.default === item.id}
+  //               onValueChange={handleDefault(item)}
+  //             />
+  //             <Text>默认</Text>
+  //           </View>
+  //           <View style={AddressStyle.line}>
+  //             <Pressable
+  //               style={AddressStyle.button}
+  //               onPress={handleDelete(item.id)}>
+  //               <Text style={AddressStyle.btnText}>删除</Text>
+  //             </Pressable>
+  //             <Pressable
+  //               style={AddressStyle.button}
+  //               onPress={handleCopy(item)}>
+  //               <Text style={AddressStyle.btnText}>复制</Text>
+  //             </Pressable>
+  //           </View>
+  //         </View>
+  //       ) : (
+  //         <></>
+  //       )}
+  //     </Pressable>
+  //   ))}
+  // </ScrollView>
 }
 
 const AddressStyle = StyleSheet.create({
