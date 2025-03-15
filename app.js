@@ -4,10 +4,6 @@ const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 require("dotenv").config();
 
-// 启动定时任务
-const initScheduleTasks = require("./tasks");
-initScheduleTasks();
-
 const indexRouter = require("./routes/index");
 const captchaRouter = require("./routes/captcha");
 const usersRouter = require("./routes/users");
@@ -20,7 +16,6 @@ const userAuth = require("./middlewares/user-auth");
 const rateLimiter = require("./middlewares/rateLimiter");
 
 const app = express();
-
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

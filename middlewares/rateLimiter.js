@@ -1,13 +1,13 @@
-const { RateLimiterMySQL } = require("rate-limiter-flexible");
-const { sequelize } = require("../models");
+const cluster = require("cluster");
+const { RateLimiterCluster } = require("rate-limiter-flexible");
+const numCPUs = require("node:os").cpus().length;
 const { failure } = require("../utils/responses");
 const { TooManyRequests } = require("http-errors");
 
-const rateLimiter = new RateLimiterMySQL({
-  storeClient: sequelize,
-  keyPrefix: "middleware",
-  points: 100, // 10 requests
-  duration: 1, // per 1 second
+const rateLimiter = new RateLimiterCluster({
+  keyPrefix: "myclusterlimiter", // Must be unique for each limiter
+  points: numCPUs * 100,
+  duration: 1,
 });
 
 const rateLimiterMiddleware = (req, res, next) => {

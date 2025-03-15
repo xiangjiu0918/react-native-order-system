@@ -10,7 +10,7 @@ const { delKey, setKey } = require("../utils/redis");
  * 每天四点半处理一次，给延迟队列兜底
  */
 function scheduleOrderCheck() {
-  schedule.scheduleJob("0 30 4 * * *", async () => {
+  schedule.scheduleJob("0 * * * * *", async () => {
     const t = await sequelize.transaction();
 
     try {
