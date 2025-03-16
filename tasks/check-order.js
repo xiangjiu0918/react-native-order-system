@@ -3,7 +3,7 @@ const { sequelize, Order, Category } = require("../models");
 const { Op } = require("sequelize");
 const logger = require("../utils/logger");
 const moment = require("moment");
-const { delKey, setKey } = require("../utils/redis");
+const { delKey, setKey, getKeysByPattern } = require("../utils/redis");
 
 /**
  * 定时检查并处理超时未支付订单
@@ -20,7 +20,7 @@ function scheduleOrderCheck() {
         where: {
           status: 0,
           orderTime: {
-            [Op.lt]: moment().subtract(1, "minute").toDate(),
+            [Op.lt]: moment().subtract(15, "minute").toDate(),
           },
         },
         transaction: t,
@@ -66,6 +66,22 @@ function scheduleOrderCheck() {
             );
             // 更新缓存
             setKey(`category:${categoryId}`, category);
+            // 回加库存了，所以有分类没售罄
+            setKey(`allStockout:${category.goodId}`, true);
+            // 这三个都涉及了库存内容，都要删掉
+            delKey(`types:${category.goodId}`);
+            delKey(`sizes:${category.goodId}`);
+            delKey(`categories:${category.goodId}`);
+            // 清除所有订单列表缓存
+            const [orderKeys, unpayOrderKeys] = await Promise.all([
+              getKeysByPattern("orders:*"),
+              getKeysByPattern("unpay-orders:*"),
+            ]);
+
+            if (orderKeys.length !== 0 || unpayOrderKeys.length !== 0) {
+              await delKey([...orderKeys, ...unpayOrderKeys]);
+            }
+
             return;
           })
         )

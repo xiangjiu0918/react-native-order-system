@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const Sequelize = require("sequelize");
-const { Good, Category, Type, Size } = require("../models");
+const { Good, Category, Type, Size, sequelize } = require("../models");
 const { success, failure } = require("../utils/responses");
 const { NotFound } = require("http-errors");
 const userAuth = require("../middlewares/user-auth");
@@ -103,13 +103,35 @@ router.get("/", async function (req, res, next) {
 router.get("/:id", async function (req, res, next) {
   try {
     const { id } = req.params;
-    const cacheKey = `good:${id}`;
-    let goodWithCatgory = await getKey(cacheKey);
-    if (!goodWithCatgory) {
-      const [good, types, sizes] = await Promise.all([
-        Good.findByPk(id, {
-          attributes: { exclude: ["createdAt", "updatedAt"] },
-        }),
+    const goodKey = `good:${id}`;
+    const typesKey = `types:${id}`;
+    const sizesKey = `sizes:${id}`;
+    const categoriesKey = `categories:${id}`;
+    const minPriceKey = `minPrice:${id}`;
+    const allStockoutKey = `allStockout:${id}`;
+    let [good, types, sizes, categories, minPrice, allStockout] =
+      await Promise.all([
+        getKey(goodKey),
+        getKey(typesKey),
+        getKey(sizesKey),
+        getKey(categoriesKey),
+        getKey(minPriceKey),
+        getKey(allStockoutKey),
+      ]);
+    if (!good) {
+      good = await Good.findByPk(id);
+      if (!good) {
+        setKey(goodKey, { msg: "not found" });
+        throw new NotFound("商品不存在！");
+      }
+      const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
+        return `http://${process.env.CDN_DOMAIN}/${i}`;
+      });
+      good = { ...good.dataValues, previewUrl };
+      setKey(goodKey, good);
+    } else if (good.msg === "not found") throw new NotFound("商品不存在！");
+    if (!types || !sizes || !categories || !minPrice) {
+      const result = await Promise.all([
         Type.findAll({
           attributes: ["id", "name", "thumbnailUrl"],
           where: { goodId: id },
@@ -119,178 +141,180 @@ router.get("/:id", async function (req, res, next) {
           where: { goodId: id },
         }),
       ]);
-      if (!good) {
-        throw new NotFound(`ID: ${id}的商品未找到。`);
-      } else {
-        const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
-          return `http://${process.env.CDN_DOMAIN}/${i}`;
-        });
-        let categories = {};
-        let transTypes = [];
-        let transSizes = [];
-        let price = Infinity; // 商品默认展示最低价格
-        let allStockout = true; // 所有种类是否售罄
-        if (types.length > 0) {
-          await Promise.all(
-            types.map(async (t, index) => {
-              // 缓存type
-              await setKey(`type:${t.id}`, t);
-              const r = await Category.findOne({
-                attributes: [
-                  [
-                    Sequelize.fn("SUM", Sequelize.col("inventory")),
-                    "inventory",
-                  ],
-                ],
-                group: ["typeId"],
-                where: { typeId: t.dataValues.id },
-              });
-              if (r.dataValues.inventory > 0) allStockout = false;
-              transTypes.push({
-                ...t.dataValues,
-                thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
-                stockout: r?.dataValues.inventory <= 0 ? true : false,
-              });
-              if (sizes.length > 0) {
-                await Promise.all(
-                  sizes.map(async (s) => {
-                    // 缓存size
-                    await setKey(`size:${s.id}`, s);
-                    let c;
-                    if (index === 0) {
-                      const arr = await Promise.all([
-                        Category.findOne({
-                          attributes: [
-                            [
-                              Sequelize.fn("SUM", Sequelize.col("inventory")),
-                              "inventory",
-                            ],
+      types = result[0];
+      sizes = result[1];
+      categories = {};
+      let transTypes = [];
+      let transSizes = [];
+      minPrice = Infinity; // 商品默认展示最低价格
+      if (types.length > 0) {
+        await Promise.all(
+          types.map(async (t, index) => {
+            // 缓存type
+            await setKey(`type:${t.id}`, t);
+            const r = await Category.findOne({
+              attributes: [
+                [Sequelize.fn("SUM", Sequelize.col("inventory")), "inventory"],
+              ],
+              group: ["typeId"],
+              where: { typeId: t.dataValues.id },
+            });
+            transTypes.push({
+              ...t.dataValues,
+              thumbnailUrl: `http://${process.env.CDN_DOMAIN}/${t.dataValues.thumbnailUrl}`,
+              stockout: r?.dataValues.inventory <= 0 ? true : false,
+            });
+            if (sizes.length > 0) {
+              await Promise.all(
+                sizes.map(async (s) => {
+                  // 缓存size
+                  await setKey(`size:${s.id}`, s);
+                  let c;
+                  if (index === 0) {
+                    const arr = await Promise.all([
+                      Category.findOne({
+                        attributes: [
+                          [
+                            Sequelize.fn("SUM", Sequelize.col("inventory")),
+                            "inventory",
                           ],
-                          group: ["sizeId"],
-                          where: { sizeId: s.dataValues.id },
-                        }),
-                        Category.findOne({
-                          where: {
-                            typeId: t.dataValues.id,
-                            sizeId: s.dataValues.id,
-                          },
-                        }),
-                      ]);
-                      c = arr[1];
-                      if (arr[0].dataValues.inventory > 0) allStockout = false;
-                      transSizes.push({
-                        ...s.dataValues,
-                        stockout:
-                          arr[0]?.dataValues.inventory <= 0 ? true : false,
-                      });
-                    } else {
-                      c = await Category.findOne({
+                        ],
+                        group: ["sizeId"],
+                        where: { sizeId: s.dataValues.id },
+                      }),
+                      Category.findOne({
                         where: {
                           typeId: t.dataValues.id,
                           sizeId: s.dataValues.id,
                         },
-                      });
-                    }
-                    await setKey(`category:${c.id}`, c);
-                    if (c.dataValues.inventory > 0) allStockout = false;
-                    categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
-                      id: c.dataValues.id,
-                      inventory: c.dataValues.inventory,
-                      price: Number(c.dataValues.price),
-                    };
-                    price = Math.min(Number(c.dataValues.price), price);
-                    return;
-                  })
-                );
-              } else {
-                const c = await Category.findOne({
+                      }),
+                    ]);
+                    c = arr[1];
+                    transSizes.push({
+                      ...s.dataValues,
+                      stockout:
+                        arr[0]?.dataValues.inventory <= 0 ? true : false,
+                    });
+                  } else {
+                    c = await Category.findOne({
+                      where: {
+                        typeId: t.dataValues.id,
+                        sizeId: s.dataValues.id,
+                      },
+                    });
+                  }
+                  await setKey(`category:${c.id}`, c);
+                  categories[`${t.dataValues.id}:${s.dataValues.id}`] = {
+                    id: c.dataValues.id,
+                    inventory: c.dataValues.inventory,
+                    price: Number(c.dataValues.price),
+                  };
+                  minPrice = Math.min(Number(c.dataValues.price), minPrice);
+                  return;
+                })
+              );
+            } else {
+              const c = await Category.findOne({
+                where: {
+                  typeId: t.dataValues.id,
+                  sizeId: null,
+                },
+              });
+              await setKey(`category:${c.id}`, c);
+              categories[`${t.dataValues.id}:-1`] = {
+                id: c.dataValues.id,
+                inventory: c.dataValues.inventory,
+                price: Number(c.dataValues.price),
+              };
+              minPrice = Math.min(Number(c.dataValues.price), minPrice);
+              return;
+            }
+          })
+        );
+      } else {
+        if (sizes.length > 0) {
+          await Promise.all(
+            sizes.map(async (s) => {
+              // 缓存size
+              await setKey(`size:${s.id}`, s);
+              let c;
+              const arr = await Promise.all([
+                Category.findOne({
+                  attributes: [
+                    [
+                      Sequelize.fn("SUM", Sequelize.col("inventory")),
+                      "inventory",
+                    ],
+                  ],
+                  group: ["sizeId"],
+                  where: { sizeId: s.dataValues.id },
+                }),
+                Category.findOne({
                   where: {
-                    typeId: t.dataValues.id,
-                    sizeId: null,
+                    typeId: null,
+                    sizeId: s.dataValues.id,
                   },
-                });
-                await setKey(`category:${c.id}`, c);
-                if (c.dataValues.inventory > 0) allStockout = false;
-                categories[`${t.dataValues.id}:-1`] = {
-                  id: c.dataValues.id,
-                  inventory: c.dataValues.inventory,
-                  price: Number(c.dataValues.price),
-                };
-                price = Math.min(Number(c.dataValues.price), price);
-                return;
-              }
+                }),
+              ]);
+              c = arr[1];
+              await setKey(`category:${c.id}`, c);
+              transSizes.push({
+                ...s.dataValues,
+                stockout: arr[0]?.dataValues.inventory <= 0 ? true : false,
+              });
+              categories[`-1:${s.dataValues.id}`] = {
+                id: c.dataValues.id,
+                inventory: c.dataValues.inventory,
+                price: Number(c.dataValues.price),
+              };
+              minPrice = Math.min(Number(c.dataValues.price), minPrice);
             })
           );
         } else {
-          if (sizes.length > 0) {
-            await Promise.all(
-              sizes.map(async (s) => {
-                // 缓存size
-                await setKey(`size:${s.id}`, s);
-                let c;
-                const arr = await Promise.all([
-                  Category.findOne({
-                    attributes: [
-                      [
-                        Sequelize.fn("SUM", Sequelize.col("inventory")),
-                        "inventory",
-                      ],
-                    ],
-                    group: ["sizeId"],
-                    where: { sizeId: s.dataValues.id },
-                  }),
-                  Category.findOne({
-                    where: {
-                      typeId: null,
-                      sizeId: s.dataValues.id,
-                    },
-                  }),
-                ]);
-                c = arr[1];
-                await setKey(`category:${c.id}`, c);
-                transSizes.push({
-                  ...s.dataValues,
-                  stockout: arr[0]?.dataValues.inventory <= 0 ? true : false,
-                });
-                if (arr[0].dataValues.inventory > 0) allStockout = false;
-                categories[`-1:${s.dataValues.id}`] = {
-                  id: c.dataValues.id,
-                  inventory: c.dataValues.inventory,
-                  price: Number(c.dataValues.price),
-                };
-                price = Math.min(Number(c.dataValues.price), price);
-              })
-            );
-          } else {
-            const c = await Category.findOne({
-              where: {
-                goodId: id,
-              },
-            });
-            await setKey(`category:${c.id}`, c);
-            if (c.dataValues.inventory > 0) allStockout = false;
-            categories["-1:-1"] = {
-              id: c.dataValues.id,
-              inventory: c.dataValues.inventory,
-              price: Number(c.dataValues.price),
-            };
-            price = Math.min(Number(c.dataValues.price), price);
-          }
+          const c = await Category.findOne({
+            where: {
+              goodId: id,
+            },
+          });
+          await setKey(`category:${c.id}`, c);
+          categories["-1:-1"] = {
+            id: c.dataValues.id,
+            inventory: c.dataValues.inventory,
+            price: Number(c.dataValues.price),
+          };
+          minPrice = Math.min(Number(c.dataValues.price), minPrice);
         }
-        goodWithCatgory = {
-          good: {
-            ...good.dataValues,
-            previewUrl,
-            price,
-            stockout: allStockout,
-          },
-          types: transTypes.sort((a, b) => a.id - b.id),
-          sizes: transSizes.sort((a, b) => a.id - b.id),
-          categories,
-        };
-        await setKey(cacheKey, goodWithCatgory);
       }
+      types = transTypes.sort((a, b) => a.id - b.id);
+      sizes = transSizes.sort((a, b) => a.id - b.id);
+      setKey(typesKey, types);
+      setKey(sizesKey, sizes);
+      setKey(categoriesKey, categories);
+      setKey(minPriceKey, minPrice);
     }
+    if (allStockout === null) {
+      const { inventory } = await Category.findOne({
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("inventory")), "inventory"],
+        ],
+        where: {
+          goodId: id,
+        },
+      });
+      allStockout = Number(inventory) <= 0;
+      setKey(allStockoutKey, allStockout);
+    }
+    // 查询
+    goodWithCatgory = {
+      good: {
+        ...good,
+        price: minPrice,
+        stockout: allStockout,
+      },
+      types,
+      sizes,
+      categories,
+    };
     success(res, "查询商品成功", {
       ...goodWithCatgory,
     });

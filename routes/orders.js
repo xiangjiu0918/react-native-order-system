@@ -35,11 +35,13 @@ function filterBody(req) {
  * @returns {Promise<void>}
  */
 async function clearCache(id = null) {
-  // 清除所有订单列表缓存
-  const keys = await getKeysByPattern("orders:*");
+  const [orderKeys, unpayOrderKeys] = await Promise.all([
+    getKeysByPattern(`orders:${order.userId}:*`),
+    getKeysByPattern(`unpay-orders:${order.userId}:*`),
+  ]);
 
-  if (keys.length !== 0) {
-    await delKey(keys);
+  if (orderKeys.length !== 0 || unpayOrderKeys.length !== 0) {
+    await delKey([...orderKeys, ...unpayOrderKeys]);
   }
 
   // 如果传递了id，则通过id清除订单详情缓存
@@ -69,11 +71,15 @@ function bindGoodInfoWithOrder(arr) {
       setKey(categoryKey, category);
     } else if (category.msg === "not found") throw new NotFound("分类不存在！");
     if (!good) {
-      good = await Good.findByPk(o.categoryId);
+      good = await Good.findByPk(o.goodId);
       if (!good) {
         setKey(categoryKey, { msg: "not found" });
         throw new NotFound("商品不存在！");
       }
+      const previewUrl = JSON.parse(good.dataValues.previewUrl).map((i) => {
+        return `http://${process.env.CDN_DOMAIN}/${i}`;
+      });
+      good = { ...good.dataValues, previewUrl };
       setKey(goodKey, good);
     } else if (good.msg === "not found") throw new NotFound("商品不存在！");
     let { typeId, sizeId } = category;
@@ -105,8 +111,10 @@ function bindGoodInfoWithOrder(arr) {
     return {
       ...o.dataValues,
       name: good.name,
+      previewUrl: good.previewUrl[0],
       type: type?.name || null,
       size: size?.name || null,
+      price: Number(category.price),
       shop: good.shop,
     };
   });
@@ -131,7 +139,8 @@ router.get("/", async function (req, res, next) {
       orders = countAndOrders.orders;
     }
     if (!orders) {
-      const { count, rows } = await Order.findAndCountAll({
+      const result = await Order.findAndCountAll({
+        order: [["id", "DESC"]],
         attributes: { exclude: ["id"] },
         where: {
           userId,
@@ -139,7 +148,8 @@ router.get("/", async function (req, res, next) {
         limit: pageSize,
         offset,
       });
-      orders = await Promise.all(bindGoodInfoWithOrder(rows));
+      count = result.count;
+      orders = await Promise.all(bindGoodInfoWithOrder(result.rows));
       setKey(cacheKey, { orders, count });
     }
     success(res, "获取订单成功", {
@@ -172,7 +182,8 @@ router.get("/unpay", async function (req, res, next) {
       orders = countAndOrders.orders;
     }
     if (!orders) {
-      const { count, rows } = await Order.findAndCountAll({
+      const result = await Order.findAndCountAll({
+        order: [["id", "DESC"]],
         attributes: { exclude: ["id"] },
         where: {
           userId,
@@ -181,7 +192,8 @@ router.get("/unpay", async function (req, res, next) {
         limit: pageSize,
         offset,
       });
-      orders = await Promise.all(bindGoodInfoWithOrder(rows));
+      count = result.count;
+      orders = await Promise.all(bindGoodInfoWithOrder(result.rows));
       setKey(cacheKey, { orders, count });
     }
     success(res, "获取订单成功", {
@@ -220,7 +232,6 @@ router.post("/", async function (req, res, next) {
     } else if (address.msg === "地址不存在") {
       throw new NotFound("地址不存在！");
     } else if (address.userId !== Number(body.userId)) {
-      console.log("address.userid", address.userId, body.userId);
       throw new BadRequest("地址id与用户id不匹配！");
     }
     // 分类相关
@@ -282,6 +293,12 @@ router.post("/", async function (req, res, next) {
     await setKey(`order:${order.orderid}`, order);
     delete order.dataValues.id;
     await setKey(categoryKey, category);
+    // 如果单类库存为0， 那么整体的库存就有可能为0
+    if (category.inventory === 0) delKey(`allStockout:${order.goodId}`);
+    // 这三个都涉及了库存内容，都要删掉
+    delKey(`types:${order.goodId}`);
+    delKey(`sizes:${order.goodId}`);
+    delKey(`categories:${order.goodId}`);
     // 创建延迟队列，15分钟后自动取消订单
     delayOrderProducer(order.orderid, 15 * 60 * 1000);
     await t.commit();
@@ -356,40 +373,6 @@ router.put("/pay/:orderid", async function (req, res, next) {
 
 /**
  * 获取单个订单
- * GET /orders/:orderid
- */
-router.get("/:orderid", async function (req, res, next) {
-  try {
-    const { orderid } = req.params;
-    // cacheKey不要加用户id，会导致缓存命中率下降
-    const cacheKey = `order:${orderid}`;
-    let order = await getKey(cacheKey);
-    if (!order) {
-      order = await Order.findOne({
-        where: { orderid },
-      });
-      if (!order) {
-        // 特殊处理
-        setKey(cacheKey, { msg: "not found" });
-        throw new NotFound("订单不存在！");
-      }
-      setKey(cacheKey, order);
-      if (order.dataValues.userId !== req.userId)
-        throw new BadRequest("订单id和用户id不匹配！");
-      delete order.dataValues.id;
-    } else if (order.msg === "not found") throw new NotFound("订单不存在！");
-    else if (order.userId !== req.userId) {
-      throw new BadRequest("订单id和用户id不匹配！");
-    } else delete order.id;
-    setKey(cacheKey, order);
-    success(res, "获取订单成功", { order });
-  } catch (e) {
-    failure(res, e, "获取订单失败");
-  }
-});
-
-/**
- * 获取订单列表
  * GET /orders/:orderid
  */
 router.get("/:orderid", async function (req, res, next) {
