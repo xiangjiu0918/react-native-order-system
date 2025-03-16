@@ -1,7 +1,7 @@
 const amqp = require("amqplib");
 const { NotFound } = require("http-errors");
 const { sequelize, Order, Address, Category } = require("../models");
-const { setKey } = require("./redis");
+const { setKey, delKey, getKeysByPattern } = require("./redis");
 
 // 创建全局的 RabbitMQ 连接和通道
 let connection;
@@ -62,7 +62,6 @@ const orderConsumer = async () => {
               lock: true,
               transaction: t,
             });
-            console.log("111", order.categoryId, category);
             category = await category.update(
               {
                 inventory: category.inventory + 1,
@@ -73,6 +72,20 @@ const orderConsumer = async () => {
               }
             );
             setKey(`category:${order.dataValues.categoryId}`, category);
+            // 处理库存相关缓存
+            setKey(`allStockout:${order.goodId}`, false);
+            delKey(`types:${order.goodId}`);
+            delKey(`sizes:${order.goodId}`);
+            delKey(`categories:${order.goodId}`);
+            // 清除用户所有订单列表缓存
+            const [orderKeys, unpayOrderKeys] = await Promise.all([
+              getKeysByPattern(`orders:${order.userId}:*`),
+              getKeysByPattern(`unpay-orders:${order.userId}:*`),
+            ]);
+
+            if (orderKeys.length !== 0 || unpayOrderKeys.length !== 0) {
+              await delKey([...orderKeys, ...unpayOrderKeys]);
+            }
             t.commit();
           }
         } catch (e) {
