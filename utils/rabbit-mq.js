@@ -1,4 +1,5 @@
 const amqp = require("amqplib");
+const { delKey, setKey, getKeysByPattern } = require("../utils/redis");
 
 // 创建全局的 RabbitMQ 连接和通道
 let connection;
@@ -46,6 +47,53 @@ const delayOrderProducer = async (msg, delay) => {
   }
 };
 
+/**
+ * 订单队列消费者（接收消息）
+ */
+const orderConsumer = async () => {
+  try {
+    await connectToRabbitMQ();
+    channel.consume(
+      "ali_queue",
+      async (msg) => {
+        let t;
+        try {
+          console.log(msg.content.toString());
+          const { method, key, value } = JSON.parse(msg.content.toString());
+          switch (method) {
+            case "setKey":
+              setKey(key, value);
+              break;
+            case "delKey":
+              delKey(key, value);
+              break;
+            case "delAll":
+              if (key === "order") {
+                const [orderKeys, unpayOrderKeys] = await Promise.all([
+                  getKeysByPattern("orders:*"),
+                  getKeysByPattern("unpay-orders:*"),
+                ]);
+
+                if (orderKeys.length !== 0 || unpayOrderKeys.length !== 0) {
+                  await delKey([...orderKeys, ...unpayOrderKeys]);
+                }
+              }
+              break;
+          }
+        } catch (e) {
+          console.log(e);
+        }
+      },
+      {
+        noAck: true,
+      }
+    );
+  } catch (error) {
+    console.error("订单队列消费者错误：", error);
+  }
+};
+
 module.exports = {
   delayOrderProducer,
+  orderConsumer,
 };
