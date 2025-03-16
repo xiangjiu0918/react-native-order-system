@@ -26,9 +26,9 @@ function initServer() {
     app(req, res);
   });
 
-  setInterval(() => {
-    console.log(`Worker ${process.pid} reqCount: ${reqCount}`);
-  }, 5000);
+  // setInterval(() => {
+  //   console.log(`Worker ${process.pid} reqCount: ${reqCount}`);
+  // }, 5000);
 
   /**
    * Listen on provided port, on all network interfaces.

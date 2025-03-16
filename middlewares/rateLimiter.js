@@ -1,14 +1,23 @@
-const cluster = require("cluster");
-const { RateLimiterCluster } = require("rate-limiter-flexible");
+const {
+  RateLimiterCluster,
+  BurstyRateLimiter,
+} = require("rate-limiter-flexible");
 const numCPUs = require("node:os").cpus().length;
 const { failure } = require("../utils/responses");
 const { TooManyRequests } = require("http-errors");
 
-const rateLimiter = new RateLimiterCluster({
-  keyPrefix: "myclusterlimiter", // Must be unique for each limiter
-  points: numCPUs * 100,
-  duration: 1,
-});
+const rateLimiter = new BurstyRateLimiter(
+  new RateLimiterCluster({
+    keyPrefix: "myclusterlimiter", // Must be unique for each limiter
+    points: numCPUs * 10,
+    duration: 1,
+  }),
+  new RateLimiterCluster({
+    keyPrefix: "myclusterlimiter", // Must be unique for each limiter
+    points: numCPUs * 40,
+    duration: 60,
+  })
+);
 
 const rateLimiterMiddleware = (req, res, next) => {
   rateLimiter
