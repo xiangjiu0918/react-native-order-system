@@ -20,7 +20,7 @@ function scheduleOrderCheck() {
         where: {
           status: 0,
           orderTime: {
-            [Op.lt]: moment().subtract(15, "minute").toDate(),
+            [Op.lt]: moment().subtract(1, "minute").toDate(),
           },
         },
         transaction: t,

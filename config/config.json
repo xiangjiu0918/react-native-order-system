@@ -17,10 +17,10 @@
     "timezone": "+08:00"
   },
   "production": {
-    "username": "root",
-    "password": "5072363976ce00d4",
+    "username": "user1",
+    "password": "123456",
     "database": "orderSystem_production",
-    "host": "127.0.0.1",
+    "host": "139.196.199.77",
     "dialect": "mysql",
     "timezone": "+08:00"
   }

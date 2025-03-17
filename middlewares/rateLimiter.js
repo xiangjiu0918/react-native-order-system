@@ -9,12 +9,12 @@ const { TooManyRequests } = require("http-errors");
 const rateLimiter = new BurstyRateLimiter(
   new RateLimiterCluster({
     keyPrefix: "myclusterlimiter", // Must be unique for each limiter
-    points: numCPUs * 10,
+    points: numCPUs * 5,
     duration: 1,
   }),
   new RateLimiterCluster({
     keyPrefix: "myclusterlimiter", // Must be unique for each limiter
-    points: numCPUs * 40,
+    points: numCPUs * 45,
     duration: 60,
   })
 );
