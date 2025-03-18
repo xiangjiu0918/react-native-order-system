@@ -14,7 +14,10 @@ const { NotFound, BadRequest } = require("http-errors");
 const { delKey, getKey, setKey, getKeysByPattern } = require("../utils/redis");
 const { Op, where } = require("sequelize");
 const { v4: uuidv4 } = require("uuid");
-const { delayOrderProducer } = require("../utils/rabbit-mq");
+const {
+  delayOrderProducer,
+  aliTencentProducer,
+} = require("../utils/rabbit-mq");
 
 /**
  * 过滤输入
@@ -241,14 +244,17 @@ router.post("/", async function (req, res, next) {
       if (!category) {
         // 特殊处理，分类不存在也放入缓存，避免大量请求访问不存在的分类
         setKey(categoryKey, { msg: "not found" });
+        aliTencentProducer("setKey", categoryKey, { msg: "not found" });
         throw new NotFound("分类不存在！");
       } else if (category.dataValues.goodId !== Number(body.goodId)) {
         // 特殊处理，分类和商品id不匹配也放入缓存，毕竟分类查询的是正确的
         // 不能提取到外层写，因为如果不是异常情况，需要缓存的是扣库存后的结果
         setKey(categoryKey, category);
+        aliTencentProducer("setKey", categoryKey, category);
         throw new BadRequest("分类id与商品id不匹配！");
       } else if (category.dataValues.inventory <= 0) {
         setKey(categoryKey, category);
+        aliTencentProducer("setKey", categoryKey, category);
         throw new NotFound("库存不足！");
       }
     } else if (category.msg === "not found") {
@@ -291,14 +297,19 @@ router.post("/", async function (req, res, next) {
     // 删除订单列表缓存
     clearCache();
     await setKey(`order:${order.orderid}`, order);
+    aliTencentProducer("setKey", `order:${order.orderid}`, order);
     delete order.dataValues.id;
     await setKey(categoryKey, category);
+    aliTencentProducer("setKey", categoryKey, category);
     // 如果单类库存为0， 那么整体的库存就有可能为0
     if (category.inventory === 0) delKey(`allStockout:${order.goodId}`);
     // 这三个都涉及了库存内容，都要删掉
     delKey(`types:${order.goodId}`);
+    aliTencentProducer("delKey", `types:${order.goodId}`);
     delKey(`sizes:${order.goodId}`);
+    aliTencentProducer("delKey", `sizes:${order.goodId}`);
     delKey(`categories:${order.goodId}`);
+    aliTencentProducer("delKey", `categories:${order.goodId}`);
     // 创建延迟队列，15分钟后自动取消订单
     delayOrderProducer(order.orderid, 15 * 60 * 1000);
     await t.commit();

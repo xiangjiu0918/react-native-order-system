@@ -22,6 +22,8 @@ const connectToRabbitMQ = async () => {
     });
     // 断言queue
     await channel.assertQueue("order_queue", { durable: true });
+    await channel.assertQueue("aliToTencent_queue", { durable: true });
+    await channel.assertQueue("tencentToAli_queue", { durable: true });
     // 将queue绑定到exchange
     channel.bindQueue("order_queue", "delay_exchange", "delay_key");
   } catch (error) {
@@ -93,7 +95,53 @@ const orderConsumer = async () => {
   }
 };
 
+const aliTencentProducer = async (method, key, value) => {
+  try {
+    await connectToRabbitMQ(); // 确保已连接
+    const msg = JSON.stringify({ method, key, value });
+
+    channel.sendToQueue("aliToTencent_queue", Buffer.from(msg), {
+      persistent: true,
+    });
+  } catch (error) {
+    console.error("类别队列生产者错误：", error);
+  }
+};
+
+const categoryConsumer = async () => {
+  try {
+    await connectToRabbitMQ();
+    channel.consume(
+      "tencentToAli_queue",
+      async (msg) => {
+        let t;
+        try {
+          console.log(msg.content.toString());
+          const { method, key, value } = JSON.parse(msg.content.toString());
+          switch (method) {
+            case "setKey":
+              setKey(key, value);
+              break;
+            case "delKey":
+              delKey(key, value);
+              break;
+          }
+        } catch (e) {
+          console.log(e);
+        }
+      },
+      {
+        noAck: true,
+      }
+    );
+  } catch (error) {
+    console.error("类别队列消费者错误：", error);
+  }
+};
+
 module.exports = {
   delayOrderProducer,
   orderConsumer,
+  aliTencentProducer,
+  categoryConsumer,
 };

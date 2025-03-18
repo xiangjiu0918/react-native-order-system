@@ -11,10 +11,11 @@ if (cluster.isPrimary) {
   console.log(`Master ${process.pid} is running`);
   new RateLimiterClusterMaster();
   // 启动订单消费者
-  const { orderConsumer } = require("./utils/rabbit-mq");
+  const { orderConsumer, categoryConsumer } = require("./utils/rabbit-mq");
   (async () => {
     await orderConsumer();
-    console.log("订单消费者已启动");
+    await categoryConsumer();
+    console.log("订单、类别消费者已启动");
   })();
   // // 启动定时任务
   // const initScheduleTasks = require("./tasks");
