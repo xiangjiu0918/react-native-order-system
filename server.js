@@ -10,16 +10,6 @@ if (cluster.isPrimary) {
   const numCPUs = os.cpus().length;
   console.log(`Master ${process.pid} is running`);
   new RateLimiterClusterMaster();
-  // 启动订单消费者
-  const { orderConsumer, categoryConsumer } = require("./utils/rabbit-mq");
-  (async () => {
-    await orderConsumer();
-    await categoryConsumer();
-    console.log("订单、类别消费者已启动");
-  })();
-  // // 启动定时任务
-  // const initScheduleTasks = require("./tasks");
-  // initScheduleTasks();
   for (let i = 0; i < numCPUs; i++) {
     cluster.fork();
   }
