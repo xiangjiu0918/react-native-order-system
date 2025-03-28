@@ -15,7 +15,7 @@ const rateLimiter = new BurstyRateLimiter(
   }),
   new RateLimiterCluster({
     keyPrefix: "outBrustlimiter", // Must be unique for each limiter
-    points: numCPUs * 60,
+    points: numCPUs * 45,
     duration: 60,
   })
 );
@@ -26,7 +26,8 @@ const rateLimiterMiddleware = (req, res, next) => {
     .then(() => {
       next();
     })
-    .catch(() => {
+    .catch((e) => {
+      console.log("e", e);
       failure(res, new TooManyRequests());
     });
 };

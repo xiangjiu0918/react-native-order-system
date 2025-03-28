@@ -16,6 +16,7 @@ const userAuth = require("./middlewares/user-auth");
 const rateLimiter = require("./middlewares/rateLimiter");
 
 const app = express();
+console.log(`Worker ${process.pid} is running`);
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
